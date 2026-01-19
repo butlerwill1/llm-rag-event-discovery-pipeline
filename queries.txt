@@ -1,0 +1,7 @@
+# Event search queries - one per line
+# Lines starting with # are comments and will be ignored
+
+London AI hackathon
+#Half marathon London  
+#Climate networking London
+SOTA Society for technological advancement hackathon
