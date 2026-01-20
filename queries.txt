@@ -1,7 +1,8 @@
 # Event search queries - one per line
 # Lines starting with # are comments and will be ignored
 
-London AI hackathon
+London AI hackathons
 #Half marathon London  
 #Climate networking London
 SOTA Society for technological advancement hackathon
+luma website has good hackathons

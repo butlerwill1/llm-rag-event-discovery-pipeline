@@ -1,0 +1,52 @@
+# Environment files (NEVER include secrets in image!)
+.env
+.env.*
+
+# CSV data files (will be in S3 or volume mounted)
+events_log.csv
+data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+README.md
+AWS_SES_SETUP.md
+EMAIL_SUMMARY.md
+QUICK_START_EMAIL.md
+
+# Test files
+test_*.py
+*_test.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+

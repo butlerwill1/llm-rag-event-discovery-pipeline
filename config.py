@@ -13,8 +13,13 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
 
 # File paths
+# Support both local development and Docker container
+DATA_DIR = os.getenv("DATA_DIR", "data")  # Use 'data' directory for Docker, current dir for local
 QUERIES_FILE = "queries.txt"
-EVENTS_LOG_FILE = "events_log.csv"
+EVENTS_LOG_FILE = os.path.join(DATA_DIR, "events_log.csv")
+
+# Create data directory if it doesn't exist
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # OpenAI Model Configuration
 MODEL_NAME = "gpt-4o"  # Using gpt-4o for higher rate limits

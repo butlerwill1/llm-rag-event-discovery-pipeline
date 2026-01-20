@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  event-finder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: event-finder:latest
+    container_name: event-finder
+    
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
+    # Mount local data directory for CSV persistence (local testing only)
+    # Mount AWS credentials for local testing (not needed on ECS)
+    volumes:
+      - ./data:/app/data
+      - ~/.aws:/root/.aws:ro
+    
+    # Optional: Override environment variables here
+    # environment:
+    #   - AWS_REGION=eu-west-1
+    #   - SES_FROM_EMAIL=londoneventsaisummary@gmail.com
+    
+    # Restart policy (for local testing, use 'no')
+    restart: "no"
+
