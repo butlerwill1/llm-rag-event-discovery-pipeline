@@ -22,7 +22,9 @@ EVENTS_LOG_FILE = os.path.join(DATA_DIR, "events_log.csv")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # OpenAI Model Configuration
-MODEL_NAME = "gpt-4o"  # Using gpt-4o for higher rate limits
+# Using GPT-5 with agentic search for intelligent, reasoning-based event discovery
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5")  # Reasoning model for agentic search
+REASONING_EFFORT = os.getenv("REASONING_EFFORT", "medium")  # minimal, low, medium, high, or xhigh
 USER_LOCATION = "London, GB"
 
 # AWS SES Configuration
@@ -33,16 +35,23 @@ SES_TO_EMAIL = os.getenv("SES_TO_EMAIL", "butler.will1@gmail.com")
 # CSV Schema
 CSV_COLUMNS = ["event_name", "event_date", "event_type", "event_url", "description", "ticket_price", "venue", "speakers", "date_logged"]
 
-# Prompt template for OpenAI
+# Prompt template for OpenAI Agentic Search
 PROMPT_TEMPLATE = """
-Please use the web to search for upcoming events based on the following query:
+You are an intelligent event discovery agent. Use web search to find upcoming events based on this query:
 "{query}"
 
-IMPORTANT: Only return FUTURE events that have NOT happened yet. Today's date is {today_date}.
-- Only include events with dates on or after {today_date}
-- Do NOT include events from the past
-- Do NOT include events that already happened
-- Verify the event date is in the future before including it
+SEARCH STRATEGY:
+- Perform multiple searches if needed to find comprehensive results
+- Check official event platforms (Eventbrite, Meetup, Luma, etc.)
+- Look for event aggregator sites specific to London
+- Verify event details from official sources
+- Cross-reference information to ensure accuracy
+
+CRITICAL DATE REQUIREMENT: Today's date is {today_date}.
+- ONLY include events with dates on or after {today_date}
+- REJECT any events from the past
+- Double-check each event date before including it
+- If a date is unclear, search for more information to confirm
 
 Return a JSON object for each event that matches the following criteria:
 - Must take place in London or nearby areas

@@ -272,7 +272,11 @@ class WeaviateEventStore:
         context = self._format_similar_events_for_llm(similar_events)
 
         # 3. Ask LLM to decide
-        logger.info(f"   🤖 Asking LLM to analyze similarity...")
+        # Note: Using gpt-4o for deduplication (not gpt-5) because:
+        # - Deduplication is a simpler task that doesn't need reasoning capabilities
+        # - gpt-4o is faster and more cost-effective for this use case
+        # - gpt-5 is reserved for complex agentic web search
+        logger.info(f"   🤖 Asking LLM (gpt-4o) to analyze similarity...")
 
         prompt = f"""You are an expert at identifying duplicate events.
 
@@ -302,8 +306,10 @@ class WeaviateEventStore:
             {{"is_duplicate": false, "reason": "explanation", "matching_event": null}}"""
 
         try:
+            # Use gpt-4o for deduplication - it's faster and cheaper than gpt-5
+            # Deduplication is a simpler task that doesn't need reasoning capabilities
             response = self.openai_client.chat.completions.create(
-                model=os.getenv("MODEL_NAME", "gpt-4o"),
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1  # Low temperature for consistent decisions

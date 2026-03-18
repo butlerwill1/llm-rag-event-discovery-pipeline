@@ -4,6 +4,23 @@ This document provides a visual overview of how the London Events AI Agent works
 
 ---
 
+## 🤖 AI Model Strategy
+
+The system uses **two different AI models** optimized for different tasks:
+
+| Task | Model | Reasoning |
+|------|-------|-----------|
+| **Event Discovery** | `gpt-5` | Agentic search with reasoning - can plan and execute multiple searches for comprehensive event discovery |
+| **Deduplication** | `gpt-4o` | Fast, cost-effective - simple comparison task doesn't need reasoning capabilities |
+| **Embeddings** | `text-embedding-3-small` | Efficient vector embeddings for semantic search |
+
+**Why this approach?**
+- ✅ **Cost-effective**: Use expensive reasoning models only where needed
+- ✅ **Performance**: gpt-4o is faster for simple tasks
+- ✅ **Quality**: gpt-5 provides superior event discovery through agentic search
+
+---
+
 ## 🔄 Complete Process Flow
 
 ```mermaid
@@ -256,9 +273,12 @@ mindmap
         Semantic Search
         Auto Embeddings
     AI Models
+      GPT-5
+        Agentic Web Search
+        Reasoning-based Discovery
       GPT-4o
-        Web Search
         Deduplication
+        Fast & Cost-effective
       text-embedding-3-small
         Vector Embeddings
     Cloud Services

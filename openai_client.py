@@ -1,9 +1,9 @@
 """
-Module for interacting with OpenAI's Responses API
+Module for interacting with OpenAI's Responses API with agentic search
 """
 import openai
 from typing import List, Dict, Any
-from config import OPENAI_API_KEY, MODEL_NAME, PROMPT_TEMPLATE
+from config import OPENAI_API_KEY, MODEL_NAME, REASONING_EFFORT, PROMPT_TEMPLATE
 
 
 class EventSearchClient:
@@ -34,14 +34,19 @@ class EventSearchClient:
             formatted_prompt = PROMPT_TEMPLATE.format(query=query, today_date=today_date)
 
             print(f"Searching for events with query: '{query}'")
+            print(f"Using agentic search with {MODEL_NAME} (reasoning effort: {REASONING_EFFORT})")
 
-            # Create the response using OpenAI's Responses API (not Chat Completions!)
+            # Create the response using OpenAI's Responses API with agentic search
+            # Using a reasoning model (gpt-5) that can actively manage the search process
             response = self.client.responses.create(
                 model=MODEL_NAME,
                 input=formatted_prompt,
+                reasoning={
+                    "effort": REASONING_EFFORT  # Controls depth and latency of search
+                },
                 tools=[
                     {
-                        "type": "web_search_preview",
+                        "type": "web_search",
                         "search_context_size": "high",  # Get more detailed context for better event info
                         "user_location": {
                             "type": "approximate",
