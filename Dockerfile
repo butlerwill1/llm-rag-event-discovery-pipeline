@@ -17,12 +17,10 @@ COPY main.py .
 COPY query_loader.py .
 COPY openai_client.py .
 COPY event_parser.py .
-COPY memory.py .
 COPY email_service.py .
+COPY weaviate_client.py .
+COPY rag_query.py .
 COPY queries.txt .
-
-# Create data directory for CSV file (will be volume mounted or use S3)
-RUN mkdir -p /app/data
 
 # Set environment variables (defaults, can be overridden at runtime)
 ENV PYTHONUNBUFFERED=1

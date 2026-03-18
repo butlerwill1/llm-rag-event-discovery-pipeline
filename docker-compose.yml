@@ -1,28 +1,57 @@
 version: '3.8'
 
 services:
+  # Weaviate vector database
+  weaviate:
+    image: semitechnologies/weaviate:1.23.7
+    container_name: weaviate
+    ports:
+      - "8080:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'  # We'll use OpenAI embeddings
+      ENABLE_MODULES: 'text2vec-openai'
+      OPENAI_APIKEY: ${OPENAI_API_KEY}
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    restart: on-failure:0
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Event finder application
   event-finder:
     build:
       context: .
       dockerfile: Dockerfile
     image: event-finder:latest
     container_name: event-finder
-    
+    depends_on:
+      weaviate:
+        condition: service_healthy
+
     # Load environment variables from .env file
     env_file:
       - .env
-    
-    # Mount local data directory for CSV persistence (local testing only)
+
+    # Add Weaviate connection
+    environment:
+      - WEAVIATE_URL=http://weaviate:8080
+
+    # Mount local data directory for CSV backup (optional)
     # Mount AWS credentials for local testing (not needed on ECS)
     volumes:
       - ./data:/app/data
       - ~/.aws:/root/.aws:ro
-    
-    # Optional: Override environment variables here
-    # environment:
-    #   - AWS_REGION=eu-west-1
-    #   - SES_FROM_EMAIL=londoneventsaisummary@gmail.com
-    
+
     # Restart policy (for local testing, use 'no')
     restart: "no"
+
+volumes:
+  weaviate-data:
 

@@ -13,20 +13,30 @@ from typing import List, Dict, Any
 from query_loader import load_queries, create_default_queries_file
 from openai_client import EventSearchClient
 from event_parser import parse_openai_response
-from memory import initialize_events_log, log_new_events, get_events_summary, search_events
+from weaviate_client import WeaviateEventStore
 from email_service import create_email_service_from_env
-from config import QUERIES_FILE, EVENTS_LOG_FILE
+from config import QUERIES_FILE
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def main():
     """Main function that orchestrates the event finding process."""
     print("🤖 Personal Event Finding AI Agent")
     print("=" * 50)
-    
-    # Initialize components
-    print("Initializing...")
-    initialize_events_log()
-    
+
+    # Initialize Weaviate store
+    print("Initializing Weaviate...")
+    try:
+        weaviate_store = WeaviateEventStore()
+        print("✅ Connected to Weaviate")
+    except Exception as e:
+        print(f"❌ Failed to connect to Weaviate: {e}")
+        print("Make sure Weaviate is running: docker-compose up -d weaviate")
+        return
+
     # Load queries
     queries = load_queries()
     if not queries:
@@ -90,36 +100,74 @@ def main():
             print(f"Waiting 10 seconds before next query to avoid rate limits...")
             time.sleep(10)
     
-    # Log new events
+    # Clean up old events first (to save costs on deduplication checks)
+    print(f"\n🧹 Cleaning up past events...")
+    deleted_count = weaviate_store.cleanup_past_events()
+    if deleted_count > 0:
+        print(f"   Removed {deleted_count} events that already occurred")
+
+    # Process and add new events
     print(f"\n💾 Processing {len(all_new_events)} total events...")
+    newly_added_events = []
+    new_count = 0
+
     if all_new_events:
-        new_count = log_new_events(all_new_events)
-        print(f"Logged {new_count} new events (skipped {len(all_new_events) - new_count} duplicates)")
+        current_timestamp = datetime.now().isoformat()
+
+        for event in all_new_events:
+            # Check if duplicate using RAG-powered deduplication
+            if not weaviate_store.is_duplicate(event):
+                # Add timestamp
+                event['date_logged'] = current_timestamp
+
+                # Add to Weaviate
+                try:
+                    weaviate_store.add_event(event)
+                    newly_added_events.append(event)
+                    new_count += 1
+                    print(f"  ✅ Added: {event['event_name']}")
+                except Exception as e:
+                    logger.error(f"Failed to add event {event['event_name']}: {e}")
+            else:
+                print(f"  ⏭️  Skipped duplicate: {event['event_name']}")
+
+        print(f"\n✅ Logged {new_count} new events (skipped {len(all_new_events) - new_count} duplicates)")
     else:
         print("No events to log")
-    
-    # Show summary
-    print(f"\n Events Summary:")
-    summary = get_events_summary()
-    print(f"Total events in database: {summary['total_events']}")
-    
-    if summary['event_types']:
-        print("Event types:")
-        for event_type, count in summary['event_types'].items():
-            print(f"  • {event_type}: {count}")
-    
-    if summary['recent_events']:
-        print("\nMost recent events:")
-        for event in summary['recent_events'][:3]:
-            print(f"  • {event['event_name']} ({event['event_type']}) - {event['event_date']}")
-    
-    print(f"\n✅ Event search completed! Check {EVENTS_LOG_FILE} for all events.")
 
-    # Send email digest
+    # Show summary
+    print(f"\n📊 Events Summary:")
+    total_events = weaviate_store.get_event_count()
+    print(f"Total events in database: {total_events}")
+
+    all_events = weaviate_store.get_all_events(limit=100)
+    if all_events:
+        # Count event types
+        event_types = {}
+        for event in all_events:
+            event_type = event.get('event_type', 'unknown')
+            event_types[event_type] = event_types.get(event_type, 0) + 1
+
+        if event_types:
+            print("Event types:")
+            for event_type, count in event_types.items():
+                print(f"  • {event_type}: {count}")
+
+        # Show recent events
+        recent_events = sorted(all_events, key=lambda x: x.get('date_logged', ''), reverse=True)[:3]
+        if recent_events:
+            print("\nMost recent events:")
+            for event in recent_events:
+                print(f"  • {event['event_name']} ({event['event_type']}) - {event['event_date']}")
+
+    print(f"\n✅ Event search completed! Events stored in Weaviate vector database.")
+
+    # Send email digest with ONLY the newly added events (not all searched events)
     print(f"\n📧 Sending email digest...")
     try:
         email_service = create_email_service_from_env()
-        email_sent = email_service.send_weekly_digest(all_new_events, summary['total_events'])
+        # Send only the events that were actually added (after deduplication)
+        email_sent = email_service.send_weekly_digest(newly_added_events, total_events)
 
         if not email_sent:
             print("⚠️  Email was not sent. Check the error messages above.")
@@ -133,10 +181,17 @@ def main():
 def interactive_mode():
     """Interactive mode for managing queries and searching events."""
     print("🔍 Interactive Event Search Mode")
-    print("Commands: search, add, remove, list, summary, quit")
-    
+    print("Commands: search, add, remove, list, summary, find, quit")
+
     client = EventSearchClient()
-    
+
+    # Initialize Weaviate
+    try:
+        weaviate_store = WeaviateEventStore()
+    except Exception as e:
+        print(f"❌ Failed to connect to Weaviate: {e}")
+        return
+
     while True:
         try:
             command = input("\n> ").strip().lower()
@@ -164,7 +219,12 @@ def interactive_mode():
 
                             save = input("\nSave these events? (y/n): ").strip().lower()
                             if save == 'y':
-                                new_count = log_new_events(events)
+                                new_count = 0
+                                for event in events:
+                                    if not weaviate_store.is_duplicate(event):
+                                        event['date_logged'] = datetime.now().isoformat()
+                                        weaviate_store.add_event(event)
+                                        new_count += 1
                                 print(f"Saved {new_count} new events")
                         else:
                             print("No events found")
@@ -184,16 +244,23 @@ def interactive_mode():
                     print(f"  {i}. {query}")
             
             elif command == "summary":
-                summary = get_events_summary()
-                print(f"Total events: {summary['total_events']}")
-                print(f"Event types: {summary['event_types']}")
-            
+                total = weaviate_store.get_event_count()
+                print(f"Total events: {total}")
+
+                all_events = weaviate_store.get_all_events(limit=100)
+                if all_events:
+                    event_types = {}
+                    for event in all_events:
+                        event_type = event.get('event_type', 'unknown')
+                        event_types[event_type] = event_types.get(event_type, 0) + 1
+                    print(f"Event types: {event_types}")
+
             elif command == "find":
                 search_term = input("Search events for: ").strip()
                 if search_term:
-                    results = search_events(search_term)
+                    results = weaviate_store.search_events(search_term, limit=10)
                     print(f"Found {len(results)} matching events:")
-                    for event in results[:10]:  # Show first 10
+                    for event in results:
                         print(f"  • {event['event_name']} - {event['event_date']}")
             
             else:
