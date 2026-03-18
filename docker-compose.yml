@@ -6,7 +6,7 @@ services:
     image: semitechnologies/weaviate:1.23.7
     container_name: weaviate
     ports:
-      - "8080:8080"
+      - "8081:8080"  # Changed to 8081 to avoid port conflict
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
@@ -41,7 +41,7 @@ services:
 
     # Add Weaviate connection
     environment:
-      - WEAVIATE_URL=http://weaviate:8080
+      - WEAVIATE_URL=http://weaviate:8080  # Inside Docker network, still use 8080
 
     # Mount local data directory for CSV backup (optional)
     # Mount AWS credentials for local testing (not needed on ECS)

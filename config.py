@@ -38,11 +38,15 @@ PROMPT_TEMPLATE = """
 Please use the web to search for upcoming events based on the following query:
 "{query}"
 
-Search for FUTURE events only - events that are scheduled to happen from today onwards. Do not include past events.
+IMPORTANT: Only return FUTURE events that have NOT happened yet. Today's date is {today_date}.
+- Only include events with dates on or after {today_date}
+- Do NOT include events from the past
+- Do NOT include events that already happened
+- Verify the event date is in the future before including it
 
 Return a JSON object for each event that matches the following criteria:
 - Must take place in London or nearby areas
-- Must be a real, scheduled event happening in the future
+- Must be a real, scheduled event happening in the future (on or after {today_date})
 - Must fall into one of the categories the user is interested in
 - Must have a confirmed date and registration/information available
 

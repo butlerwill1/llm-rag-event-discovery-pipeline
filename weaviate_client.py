@@ -125,24 +125,48 @@ class WeaviateEventStore:
     def add_event(self, event: Dict[str, Any]) -> str:
         """
         Add an event to Weaviate.
-        
+
         Args:
             event: Event dictionary with keys matching schema
-            
+
         Returns:
             UUID of created object
         """
+        # Helper function to convert dates to RFC3339 format
+        def to_rfc3339(date_str: str) -> str:
+            """Convert date string to RFC3339 format with timezone."""
+            if not date_str:
+                return ""
+
+            try:
+                # If it's already a full datetime with timezone, return as-is
+                if 'T' in date_str and ('+' in date_str or 'Z' in date_str):
+                    return date_str
+
+                # If it's a datetime without timezone (e.g., "2026-03-18T14:15:41.024894")
+                if 'T' in date_str:
+                    # Add UTC timezone
+                    return date_str + 'Z'
+
+                # If it's just a date (e.g., "2026-03-01")
+                # Convert to datetime at midnight UTC
+                return date_str + 'T00:00:00Z'
+
+            except Exception as e:
+                logger.warning(f"Failed to convert date '{date_str}': {e}")
+                return date_str
+
         # Prepare data object
         data_object = {
             "eventName": event.get("event_name", ""),
-            "eventDate": event.get("event_date", ""),
+            "eventDate": to_rfc3339(event.get("event_date", "")),
             "eventType": event.get("event_type", ""),
             "eventUrl": event.get("event_url", ""),
             "description": event.get("description", ""),
             "ticketPrice": event.get("ticket_price", ""),
             "venue": event.get("venue", ""),
             "speakers": event.get("speakers", ""),
-            "dateLogged": datetime.now().isoformat()
+            "dateLogged": to_rfc3339(datetime.now().isoformat())
         }
         
         # Add to Weaviate
@@ -165,6 +189,8 @@ class WeaviateEventStore:
         Returns:
             True if duplicate found, False otherwise
         """
+        logger.info(f"🔍 Checking for duplicates: {event.get('event_name')}")
+
         # Method 1: Exact URL match (fast path - always check this first)
         url_results = (
             self.client.query
@@ -179,7 +205,7 @@ class WeaviateEventStore:
         )
 
         if url_results.get("data", {}).get("Get", {}).get("Event"):
-            logger.info(f"✓ Duplicate found (exact URL): {event.get('event_name')}")
+            logger.info(f"   ✓ Duplicate found (exact URL match)")
             return True
 
         # Method 2: RAG-powered LLM deduplication
@@ -221,6 +247,8 @@ class WeaviateEventStore:
         # 1. Retrieve similar events (cast wider net with lower threshold)
         search_text = f"{event.get('event_name', '')} {event.get('description', '')}"
 
+        logger.info(f"   🔎 Searching for similar events in database...")
+
         results = (
             self.client.query
             .get("Event", ["eventName", "eventDate", "eventUrl", "description", "venue", "eventType"])
@@ -235,12 +263,17 @@ class WeaviateEventStore:
         similar_events = results.get("data", {}).get("Get", {}).get("Event", [])
 
         if not similar_events:
+            logger.info(f"   ✗ No similar events found in database")
             return False
+
+        logger.info(f"   📊 Found {len(similar_events)} similar event(s) in database")
 
         # 2. Build context for LLM
         context = self._format_similar_events_for_llm(similar_events)
 
         # 3. Ask LLM to decide
+        logger.info(f"   🤖 Asking LLM to analyze similarity...")
+
         prompt = f"""You are an expert at identifying duplicate events.
 
             New Event Being Checked:
@@ -279,13 +312,13 @@ class WeaviateEventStore:
             result = json.loads(response.choices[0].message.content)
 
             if result.get("is_duplicate"):
-                logger.info(f"✓ Duplicate found (LLM decision): {event.get('event_name')}")
-                logger.info(f"  Reason: {result.get('reason')}")
-                logger.info(f"  Matches: {result.get('matching_event')}")
+                logger.info(f"   ✓ LLM Decision: DUPLICATE")
+                logger.info(f"      Reason: {result.get('reason')}")
+                logger.info(f"      Matches: {result.get('matching_event')}")
                 return True
             else:
-                logger.info(f"✗ Not a duplicate (LLM decision): {event.get('event_name')}")
-                logger.debug(f"  Reason: {result.get('reason')}")
+                logger.info(f"   ✗ LLM Decision: NOT a duplicate")
+                logger.info(f"      Reason: {result.get('reason')}")
                 return False
 
         except Exception as e:

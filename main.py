@@ -3,7 +3,7 @@
 Personal Event Finding AI Agent
 
 This script periodically searches for London-based events using OpenAI's Responses API
-and logs new events to a CSV file while avoiding duplicates.
+and logs new events to a Weaviate Vector Database.
 """
 
 import sys
@@ -18,6 +18,12 @@ from email_service import create_email_service_from_env
 from config import QUERIES_FILE
 from datetime import datetime
 import logging
+
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s'  # Simple format for clean output
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,13 +114,42 @@ def main():
 
     # Process and add new events
     print(f"\n💾 Processing {len(all_new_events)} total events...")
+
+    # Get current database stats
+    total_in_db = weaviate_store.get_event_count()
+    print(f"   Current events in database: {total_in_db}")
+
     newly_added_events = []
     new_count = 0
+    skipped_past = 0
 
     if all_new_events:
         current_timestamp = datetime.now().isoformat()
+        today = datetime.now().date()
+
+        print(f"\n🔍 Starting deduplication process...")
+        print(f"   Checking each event against {total_in_db} existing events\n")
 
         for event in all_new_events:
+            # Filter out past events
+            event_date_str = event.get('event_date', '')
+            if event_date_str:
+                try:
+                    # Parse the event date
+                    if 'T' in event_date_str:
+                        event_date = datetime.fromisoformat(event_date_str.replace('Z', '')).date()
+                    else:
+                        event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
+
+                    # Skip if event is in the past
+                    if event_date < today:
+                        print(f"  ⏭️  Skipped past event: {event['event_name']} ({event_date_str})")
+                        skipped_past += 1
+                        continue
+                except Exception as e:
+                    logger.warning(f"Could not parse date for {event['event_name']}: {event_date_str}")
+                    # Continue processing if date parsing fails
+
             # Check if duplicate using RAG-powered deduplication
             if not weaviate_store.is_duplicate(event):
                 # Add timestamp
@@ -131,7 +166,12 @@ def main():
             else:
                 print(f"  ⏭️  Skipped duplicate: {event['event_name']}")
 
-        print(f"\n✅ Logged {new_count} new events (skipped {len(all_new_events) - new_count} duplicates)")
+        duplicates_skipped = len(all_new_events) - new_count - skipped_past
+        print(f"\n✅ Logged {new_count} new events")
+        if skipped_past > 0:
+            print(f"   ⏭️  Skipped {skipped_past} past events")
+        if duplicates_skipped > 0:
+            print(f"   ⏭️  Skipped {duplicates_skipped} duplicates")
     else:
         print("No events to log")
 

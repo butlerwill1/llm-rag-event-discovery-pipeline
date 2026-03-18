@@ -26,8 +26,12 @@ class EventSearchClient:
             str: Raw response content from OpenAI
         """
         try:
-            # Format the prompt with the query
-            formatted_prompt = PROMPT_TEMPLATE.format(query=query)
+            # Get today's date
+            from datetime import datetime
+            today_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Format the prompt with the query and today's date
+            formatted_prompt = PROMPT_TEMPLATE.format(query=query, today_date=today_date)
 
             print(f"Searching for events with query: '{query}'")
 
