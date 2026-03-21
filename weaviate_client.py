@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import logging
 import json
 from openai import OpenAI
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,13 @@ class WeaviateEventStore:
             )
         )
 
-        # Set OpenAI API key as environment variable for Weaviate's text2vec-openai module
-        os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
+        # Initialize local embedding model (free, no API calls needed!)
+        # Using all-MiniLM-L6-v2: fast, lightweight (80MB), good quality
+        logger.info("Loading local embedding model (all-MiniLM-L6-v2)...")
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        logger.info("✅ Local embedding model loaded successfully")
 
+        # Keep OpenAI client for LLM-based duplicate detection
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self._ensure_schema()
     
@@ -159,9 +164,19 @@ class WeaviateEventStore:
             "dateLogged": to_rfc3339(datetime.now().isoformat())
         }
 
-        # Add to Weaviate (v4 API)
+        # Generate embedding locally (no API calls!)
+        # Combine the most important fields for semantic search
+        text_to_embed = f"{event.get('event_name', '')} {event.get('description', '')} {event.get('event_type', '')} {event.get('venue', '')}"
+        vector = self.embedding_model.encode(text_to_embed).tolist()
+
+        logger.debug(f"Generated {len(vector)}-dimensional embedding for event")
+
+        # Add to Weaviate (v4 API) with vector
         events = self.client.collections.get("Event")
-        uuid = events.data.insert(properties=properties)
+        uuid = events.data.insert(
+            properties=properties,
+            vector=vector  # Include the locally-generated embedding
+        )
 
         logger.info(f"Added event to Weaviate: {event.get('event_name')} (UUID: {uuid})")
         return str(uuid)
@@ -198,12 +213,15 @@ class WeaviateEventStore:
             return self._is_duplicate_simple(event)
 
     def _is_duplicate_simple(self, event: Dict[str, Any], similarity_threshold: float = 0.95) -> bool:
-        """Simple semantic similarity check without LLM."""
+        """Simple semantic similarity check without LLM using local embeddings."""
         search_text = f"{event.get('event_name', '')} {event.get('description', '')}"
 
+        # Generate query embedding locally
+        query_vector = self.embedding_model.encode(search_text).tolist()
+
         events = self.client.collections.get("Event")
-        results = events.query.near_text(
-            query=search_text,
+        results = events.query.near_vector(
+            near_vector=query_vector,
             certainty=similarity_threshold,
             limit=1
         )
@@ -220,15 +238,19 @@ class WeaviateEventStore:
         """
         Use RAG + LLM to intelligently determine if event is duplicate.
         More accurate than simple similarity threshold.
+        Uses local embeddings for retrieval.
         """
         # 1. Retrieve similar events (cast wider net with lower threshold)
         search_text = f"{event.get('event_name', '')} {event.get('description', '')}"
 
         logger.info(f"   🔎 Searching for similar events in database...")
 
+        # Generate query embedding locally
+        query_vector = self.embedding_model.encode(search_text).tolist()
+
         events = self.client.collections.get("Event")
-        results = events.query.near_text(
-            query=search_text,
+        results = events.query.near_vector(
+            near_vector=query_vector,
             certainty=0.85,  # Lower threshold to catch more candidates
             limit=5  # Get top 5 similar events
         )
@@ -350,7 +372,7 @@ class WeaviateEventStore:
 
     def search_events(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
-        Semantic search for events.
+        Semantic search for events using local embeddings.
 
         Args:
             query: Natural language query
@@ -359,9 +381,12 @@ class WeaviateEventStore:
         Returns:
             List of matching events
         """
+        # Generate query embedding locally
+        query_vector = self.embedding_model.encode(query).tolist()
+
         events = self.client.collections.get("Event")
-        results = events.query.near_text(
-            query=query,
+        results = events.query.near_vector(
+            near_vector=query_vector,
             limit=limit
         )
 

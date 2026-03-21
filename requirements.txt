@@ -7,3 +7,6 @@ boto3>=1.28.0
 weaviate-client>=4.0.0
 langchain>=0.1.0
 langchain-openai>=0.0.5
+
+# Local embeddings (cost-free alternative to OpenAI embeddings)
+sentence-transformers>=2.2.0
