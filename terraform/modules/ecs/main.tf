@@ -141,19 +141,8 @@ resource "aws_ecs_task_definition" "main" {
           value = "none"
         },
         {
-          name  = "ENABLE_MODULES"
-          value = "text2vec-openai"
-        },
-        {
           name  = "CLUSTER_HOSTNAME"
           value = "node1"
-        }
-      ]
-
-      secrets = [
-        {
-          name      = "OPENAI_APIKEY"
-          valueFrom = var.openai_api_key_arn
         }
       ]
 

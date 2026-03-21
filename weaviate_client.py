@@ -55,12 +55,11 @@ class WeaviateEventStore:
             return
 
         # Create collection with properties (v4 API)
+        # Note: No vectorizer configured - we handle vectorization via OpenAI API in Python
         self.client.collections.create(
             name="Event",
             description="London events found by AI agent",
-            vectorizer_config=Configure.Vectorizer.text2vec_openai(
-                model="text-embedding-3-small"
-            ),
+            vectorizer_config=Configure.Vectorizer.none(),
             properties=[
                 Property(
                     name="eventName",
