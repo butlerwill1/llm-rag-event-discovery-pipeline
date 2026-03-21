@@ -1,0 +1,60 @@
+name: Manual ECS Task Run
+
+on:
+  workflow_dispatch:  # Only manual trigger
+    inputs:
+      image_tag:
+        description: 'Docker image tag to use (default: latest)'
+        required: false
+        default: 'latest'
+
+env:
+  AWS_REGION: eu-west-1
+  ECS_CLUSTER: london-events-cluster
+  ECS_TASK_FAMILY: london-events-task
+
+jobs:
+  run-task:
+    name: Trigger ECS Task
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get ECS configuration
+      id: ecs-config
+      run: |
+        # Get subnet and security group from existing task definition
+        TASK_DEF=$(aws ecs describe-task-definition --task-definition $ECS_TASK_FAMILY --query 'taskDefinition' --output json)
+        
+        # Get VPC configuration (you'll need to set these as outputs in Terraform)
+        SUBNET=$(aws ec2 describe-subnets --filters "Name=tag:Name,Values=*london-events*public*" --query 'Subnets[0].SubnetId' --output text)
+        SG=$(aws ec2 describe-security-groups --filters "Name=tag:Name,Values=*london-events-task*" --query 'SecurityGroups[0].GroupId' --output text)
+        
+        echo "subnet=$SUBNET" >> $GITHUB_OUTPUT
+        echo "security_group=$SG" >> $GITHUB_OUTPUT
+    
+    - name: Run ECS task
+      run: |
+        TASK_ARN=$(aws ecs run-task \
+          --cluster $ECS_CLUSTER \
+          --task-definition $ECS_TASK_FAMILY \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[${{ steps.ecs-config.outputs.subnet }}],securityGroups=[${{ steps.ecs-config.outputs.security_group }}],assignPublicIp=ENABLED}" \
+          --query 'tasks[0].taskArn' \
+          --output text)
+        
+        echo "✅ Task started: $TASK_ARN"
+        echo "📊 View logs: https://console.aws.amazon.com/cloudwatch/home?region=$AWS_REGION#logsV2:log-groups/log-group//ecs/london-events"
+    
+    - name: Wait for task to start
+      run: |
+        echo "⏳ Waiting for task to start..."
+        sleep 30
+        echo "✅ Task should be running now. Check CloudWatch logs for progress."
+

@@ -5,7 +5,10 @@ resource "aws_secretsmanager_secret" "openai_api_key" {
   name        = "${var.project_name}/openai-api-key"
   description = "OpenAI API key for event search"
 
-  recovery_window_in_days = 7  # Allow recovery if accidentally deleted
+  # Set to 0 for immediate deletion (no recovery window)
+  # Useful for dev/test environments to avoid this error
+  # For production, consider setting to 7 or 30 days
+  recovery_window_in_days = 0
 
   tags = merge(
     var.tags,
