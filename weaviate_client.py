@@ -4,6 +4,8 @@ Weaviate vector database client for semantic event storage and retrieval.
 
 import os
 import weaviate
+import weaviate.classes as wvc
+from weaviate.classes.config import Property, DataType, Configure
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -46,93 +48,70 @@ class WeaviateEventStore:
         self._ensure_schema()
     
     def _ensure_schema(self):
-        """Create Event schema if it doesn't exist."""
-        schema = {
-            "class": "Event",
-            "description": "London events found by AI agent",
-            "vectorizer": "text2vec-openai",
-            "moduleConfig": {
-                "text2vec-openai": {
-                    "model": "text-embedding-3-small",
-                    "vectorizeClassName": False,
-                    "vectorizePropertyName": False
-                }
-            },
-            "properties": [
-                {
-                    "name": "eventName",
-                    "dataType": ["text"],
-                    "description": "Name of the event",
-                    "moduleConfig": {
-                        "text2vec-openai": {
-                            "skip": False,
-                            "vectorizePropertyName": False
-                        }
-                    }
-                },
-                {
-                    "name": "eventDate",
-                    "dataType": ["date"],
-                    "description": "Date of the event"
-                },
-                {
-                    "name": "eventType",
-                    "dataType": ["text"],
-                    "description": "Type/category of event"
-                },
-                {
-                    "name": "eventUrl",
-                    "dataType": ["text"],
-                    "description": "URL to event page",
-                    "tokenization": "field",  # Don't split URL
-                    "moduleConfig": {
-                        "text2vec-openai": {
-                            "skip": True  # Don't vectorize URLs
-                        }
-                    }
-                },
-                {
-                    "name": "description",
-                    "dataType": ["text"],
-                    "description": "Event description",
-                    "moduleConfig": {
-                        "text2vec-openai": {
-                            "skip": False,
-                            "vectorizePropertyName": False
-                        }
-                    }
-                },
-                {
-                    "name": "ticketPrice",
-                    "dataType": ["text"],
-                    "description": "Ticket price information"
-                },
-                {
-                    "name": "venue",
-                    "dataType": ["text"],
-                    "description": "Event venue/location"
-                },
-                {
-                    "name": "speakers",
-                    "dataType": ["text"],
-                    "description": "Event speakers or organizers"
-                },
-                {
-                    "name": "dateLogged",
-                    "dataType": ["date"],
-                    "description": "When this event was found by the agent"
-                }
+        """Create Event collection if it doesn't exist (v4 API)."""
+        # Check if collection exists
+        if self.client.collections.exists("Event"):
+            logger.info("Event collection already exists")
+            return
+
+        # Create collection with properties (v4 API)
+        self.client.collections.create(
+            name="Event",
+            description="London events found by AI agent",
+            vectorizer_config=Configure.Vectorizer.text2vec_openai(
+                model="text-embedding-3-small"
+            ),
+            properties=[
+                Property(
+                    name="eventName",
+                    data_type=DataType.TEXT,
+                    description="Name of the event"
+                ),
+                Property(
+                    name="eventDate",
+                    data_type=DataType.DATE,
+                    description="Date and time of the event"
+                ),
+                Property(
+                    name="eventType",
+                    data_type=DataType.TEXT,
+                    description="Type/category of event"
+                ),
+                Property(
+                    name="eventUrl",
+                    data_type=DataType.TEXT,
+                    description="URL to event details",
+                    skip_vectorization=True,
+                    tokenization=wvc.config.Tokenization.FIELD
+                ),
+                Property(
+                    name="description",
+                    data_type=DataType.TEXT,
+                    description="Event description"
+                ),
+                Property(
+                    name="ticketPrice",
+                    data_type=DataType.TEXT,
+                    description="Ticket price information"
+                ),
+                Property(
+                    name="venue",
+                    data_type=DataType.TEXT,
+                    description="Event venue/location"
+                ),
+                Property(
+                    name="speakers",
+                    data_type=DataType.TEXT,
+                    description="Event speakers or performers"
+                ),
+                Property(
+                    name="dateLogged",
+                    data_type=DataType.DATE,
+                    description="When this event was found by the agent"
+                )
             ]
-        }
-        
-        # Check if schema exists
-        try:
-            existing_schema = self.client.schema.get("Event")
-            logger.info("Event schema already exists")
-        except Exception:
-            # Create schema
-            self.client.schema.create_class(schema)
-            logger.info("Created Event schema in Weaviate")
+        )
+        logger.info("Created Event collection in Weaviate")
     
     def add_event(self, event: Dict[str, Any]) -> str:
         """
