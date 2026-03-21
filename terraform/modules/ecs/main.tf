@@ -20,7 +20,7 @@ resource "aws_ecs_cluster" "main" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "main" {
   name              = var.log_group_name
-  retention_in_days = 7  # Keep logs for 7 days (cost optimization)
+  retention_in_days = 7 # Keep logs for 7 days (cost optimization)
 
   tags = merge(
     var.tags,
@@ -184,7 +184,7 @@ resource "aws_ecs_task_definition" "main" {
       image     = var.event_finder_image
       cpu       = var.event_finder_cpu
       memory    = var.event_finder_memory
-      essential = false  # Allow task to complete when this container exits
+      essential = false # Allow task to complete when this container exits
 
       # Wait for Weaviate to be healthy before starting
       dependsOn = [

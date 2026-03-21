@@ -54,25 +54,25 @@ variable "ses_to_email" {
 variable "weaviate_cpu" {
   description = "CPU units for Weaviate container (256 = 0.25 vCPU)"
   type        = number
-  default     = 512  # 0.5 vCPU
+  default     = 512 # 0.5 vCPU
 }
 
 variable "weaviate_memory" {
   description = "Memory for Weaviate container in MB"
   type        = number
-  default     = 1024  # 1 GB
+  default     = 1024 # 1 GB
 }
 
 variable "event_finder_cpu" {
   description = "CPU units for event-finder container (256 = 0.25 vCPU)"
   type        = number
-  default     = 256  # 0.25 vCPU
+  default     = 256 # 0.25 vCPU
 }
 
 variable "event_finder_memory" {
   description = "Memory for event-finder container in MB"
   type        = number
-  default     = 512  # 0.5 GB
+  default     = 512 # 0.5 GB
 }
 
 # Total task CPU and memory (must be valid Fargate combination)
@@ -80,20 +80,20 @@ variable "event_finder_memory" {
 variable "task_cpu" {
   description = "Total CPU for the task (sum of all containers)"
   type        = string
-  default     = "1024"  # 1 vCPU
+  default     = "1024" # 1 vCPU
 }
 
 variable "task_memory" {
   description = "Total memory for the task (sum of all containers)"
   type        = string
-  default     = "2048"  # 2 GB
+  default     = "2048" # 2 GB
 }
 
 # Scheduling
 variable "schedule_expression" {
   description = "EventBridge schedule expression (cron or rate)"
   type        = string
-  default     = "cron(0 9 * * ? *)"  # 9 AM UTC daily
+  default     = "cron(0 9 * * ? *)" # 9 AM UTC daily
 }
 
 # Networking

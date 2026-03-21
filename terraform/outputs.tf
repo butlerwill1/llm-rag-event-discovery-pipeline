@@ -67,7 +67,7 @@ output "public_subnet_ids" {
 
 output "deployment_instructions" {
   description = "Instructions for deploying the application"
-  value = <<-EOT
+  value       = <<-EOT
     
     ╔════════════════════════════════════════════════════════════════════╗
     ║          London Events AI Agent - Deployment Complete!            ║

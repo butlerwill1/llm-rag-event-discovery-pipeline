@@ -6,8 +6,8 @@ resource "aws_efs_file_system" "weaviate" {
   encrypted      = true
 
   # Performance mode
-  performance_mode = "generalPurpose"  # or "maxIO" for higher throughput
-  throughput_mode  = "bursting"        # or "provisioned" for consistent throughput
+  performance_mode = "generalPurpose" # or "maxIO" for higher throughput
+  throughput_mode  = "bursting"       # or "provisioned" for consistent throughput
 
   # Lifecycle policy to transition files to IA storage class (cost optimization)
   lifecycle_policy {
