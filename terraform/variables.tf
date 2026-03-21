@@ -139,10 +139,5 @@ variable "weaviate_image" {
   default     = "semitechnologies/weaviate:1.23.7"
 }
 
-# Cost Optimization
-variable "enable_nat_gateway" {
-  description = "Enable NAT Gateway (costs ~$32/month). If false, uses public subnets with public IPs"
-  type        = bool
-  default     = false  # Set to false to save costs
-}
+
 

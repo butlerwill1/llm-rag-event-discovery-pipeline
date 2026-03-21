@@ -13,12 +13,6 @@ variable "availability_zones" {
   type        = list(string)
 }
 
-variable "enable_nat_gateway" {
-  description = "Enable NAT Gateway for private subnets (costs ~$32/month)"
-  type        = bool
-  default     = false
-}
-
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

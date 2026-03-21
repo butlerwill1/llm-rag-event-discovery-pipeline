@@ -91,12 +91,12 @@ output "deployment_instructions" {
        Check your email and click the verification links!
     
     3. Test the task manually (optional):
-       
+
        aws ecs run-task \
          --cluster ${module.ecs.cluster_name} \
          --task-definition ${module.ecs.task_definition_family} \
          --launch-type FARGATE \
-         --network-configuration "awsvpcConfiguration={subnets=[${join(",", var.enable_nat_gateway ? module.vpc.private_subnet_ids : module.vpc.public_subnet_ids)}],securityGroups=[${module.ecs.task_security_group_id}],assignPublicIp=${!var.enable_nat_gateway ? "ENABLED" : "DISABLED"}}"
+         --network-configuration "awsvpcConfiguration={subnets=[${join(",", module.vpc.public_subnet_ids)}],securityGroups=[${module.ecs.task_security_group_id}],assignPublicIp=ENABLED}"
     
     4. View logs in CloudWatch:
        

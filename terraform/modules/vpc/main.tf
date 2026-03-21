@@ -61,37 +61,8 @@ resource "aws_subnet" "private" {
   )
 }
 
-# Elastic IP for NAT Gateway (only if enabled)
-resource "aws_eip" "nat" {
-  count  = var.enable_nat_gateway ? 1 : 0
-  domain = "vpc"
-
-  tags = merge(
-    var.tags,
-    {
-      Name = "${var.project_name}-nat-eip"
-    }
-  )
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-# NAT Gateway (only if enabled - costs ~$32/month)
-resource "aws_nat_gateway" "main" {
-  count = var.enable_nat_gateway ? 1 : 0
-
-  allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
-
-  tags = merge(
-    var.tags,
-    {
-      Name = "${var.project_name}-nat-gateway"
-    }
-  )
-
-  depends_on = [aws_internet_gateway.main]
-}
+# NAT Gateway removed - using public subnets for cost optimization
+# For a task that runs 2 min/day, NAT Gateway ($35/month) is not cost-effective
 
 # Route Table for Public Subnets
 resource "aws_route_table" "public" {
@@ -119,17 +90,12 @@ resource "aws_route_table_association" "public" {
 }
 
 # Route Table for Private Subnets
+# No internet route - truly isolated subnets
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  # Only add NAT gateway route if enabled
-  dynamic "route" {
-    for_each = var.enable_nat_gateway ? [1] : []
-    content {
-      cidr_block     = "0.0.0.0/0"
-      nat_gateway_id = aws_nat_gateway.main[0].id
-    }
-  }
+  # No routes to internet - private subnets are isolated
+  # This is intentional for resources that don't need internet access
 
   tags = merge(
     var.tags,

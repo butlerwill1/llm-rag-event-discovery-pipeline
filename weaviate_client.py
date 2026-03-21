@@ -24,8 +24,10 @@ class WeaviateEventStore:
             url: Weaviate instance URL (defaults to env var WEAVIATE_URL)
         """
         self.url = url or os.getenv("WEAVIATE_URL", "http://localhost:8080")
+
+        # Use Weaviate v3 client initialization (compatible with weaviate-client>=3.25.0)
         self.client = weaviate.Client(
-            url=self.url,
+            self.url,  # First positional argument is the URL
             additional_headers={
                 "X-OpenAI-Api-Key": os.getenv("OPENAI_API_KEY")
             }
