@@ -16,22 +16,32 @@ logger = logging.getLogger(__name__)
 class WeaviateEventStore:
     """Manages event storage and retrieval in Weaviate vector database."""
     
-    def __init__(self, url: str = None):
+    def __init__(self, host: str = None, port: int = None, grpc_port: int = None):
         """
-        Initialize Weaviate client.
+        Initialize Weaviate client (v4 API).
 
         Args:
-            url: Weaviate instance URL (defaults to env var WEAVIATE_URL)
+            host: Weaviate host (defaults to env var WEAVIATE_HOST or 'localhost')
+            port: Weaviate HTTP port (defaults to env var WEAVIATE_PORT or 8080)
+            grpc_port: Weaviate gRPC port (defaults to env var WEAVIATE_GRPC_PORT or 50051)
         """
-        self.url = url or os.getenv("WEAVIATE_URL", "http://localhost:8080")
+        host = host or os.getenv("WEAVIATE_HOST", "localhost")
+        port = port or int(os.getenv("WEAVIATE_PORT", "8080"))
+        grpc_port = grpc_port or int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
 
-        # Use Weaviate v3 client initialization (compatible with weaviate-client>=3.25.0)
-        self.client = weaviate.Client(
-            self.url,  # First positional argument is the URL
-            additional_headers={
-                "X-OpenAI-Api-Key": os.getenv("OPENAI_API_KEY")
-            }
+        # Use Weaviate v4 client initialization
+        self.client = weaviate.connect_to_local(
+            host=host,
+            port=port,
+            grpc_port=grpc_port,
+            additional_config=weaviate.classes.init.AdditionalConfig(
+                timeout=(10, 60)  # (connection_timeout, read_timeout) in seconds
+            )
         )
+
+        # Set OpenAI API key as environment variable for Weaviate's text2vec-openai module
+        os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
+
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self._ensure_schema()
     

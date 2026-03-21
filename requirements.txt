@@ -4,6 +4,6 @@ python-dotenv>=1.0.0
 boto3>=1.28.0
 
 # Vector database and RAG
-weaviate-client>=3.25.0
+weaviate-client>=4.0.0
 langchain>=0.1.0
 langchain-openai>=0.0.5
