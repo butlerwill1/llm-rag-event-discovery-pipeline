@@ -148,7 +148,7 @@ class WeaviateEventStore:
                 return date_str
 
         # Prepare data object
-        data_object = {
+        properties = {
             "eventName": event.get("event_name", ""),
             "eventDate": to_rfc3339(event.get("event_date", "")),
             "eventType": event.get("event_type", ""),
@@ -159,15 +159,13 @@ class WeaviateEventStore:
             "speakers": event.get("speakers", ""),
             "dateLogged": to_rfc3339(datetime.now().isoformat())
         }
-        
-        # Add to Weaviate
-        uuid = self.client.data_object.create(
-            data_object=data_object,
-            class_name="Event"
-        )
-        
+
+        # Add to Weaviate (v4 API)
+        events = self.client.collections.get("Event")
+        uuid = events.data.insert(properties=properties)
+
         logger.info(f"Added event to Weaviate: {event.get('event_name')} (UUID: {uuid})")
-        return uuid
+        return str(uuid)
 
     def is_duplicate(self, event: Dict[str, Any], use_llm: bool = True) -> bool:
         """
@@ -183,19 +181,13 @@ class WeaviateEventStore:
         logger.info(f"🔍 Checking for duplicates: {event.get('event_name')}")
 
         # Method 1: Exact URL match (fast path - always check this first)
-        url_results = (
-            self.client.query
-            .get("Event", ["eventName", "eventUrl"])
-            .with_where({
-                "path": ["eventUrl"],
-                "operator": "Equal",
-                "valueText": event.get("event_url", "")
-            })
-            .with_limit(1)
-            .do()
+        events = self.client.collections.get("Event")
+        url_results = events.query.fetch_objects(
+            filters=wvc.query.Filter.by_property("eventUrl").equal(event.get("event_url", "")),
+            limit=1
         )
 
-        if url_results.get("data", {}).get("Get", {}).get("Event"):
+        if len(url_results.objects) > 0:
             logger.info(f"   ✓ Duplicate found (exact URL match)")
             return True
 
@@ -210,22 +202,17 @@ class WeaviateEventStore:
         """Simple semantic similarity check without LLM."""
         search_text = f"{event.get('event_name', '')} {event.get('description', '')}"
 
-        results = (
-            self.client.query
-            .get("Event", ["eventName", "eventUrl", "description"])
-            .with_near_text({
-                "concepts": [search_text],
-                "certainty": similarity_threshold
-            })
-            .with_limit(1)
-            .do()
+        events = self.client.collections.get("Event")
+        results = events.query.near_text(
+            query=search_text,
+            certainty=similarity_threshold,
+            limit=1
         )
 
-        similar_events = results.get("data", {}).get("Get", {}).get("Event", [])
-
-        if similar_events:
+        if len(results.objects) > 0:
+            similar_event = results.objects[0]
             logger.info(f"✓ Duplicate found (semantic similarity): {event.get('event_name')} "
-                       f"similar to {similar_events[0]['eventName']}")
+                       f"similar to {similar_event.properties['eventName']}")
             return True
 
         return False
@@ -240,24 +227,21 @@ class WeaviateEventStore:
 
         logger.info(f"   🔎 Searching for similar events in database...")
 
-        results = (
-            self.client.query
-            .get("Event", ["eventName", "eventDate", "eventUrl", "description", "venue", "eventType"])
-            .with_near_text({
-                "concepts": [search_text],
-                "certainty": 0.85  # Lower threshold to catch more candidates
-            })
-            .with_limit(5)  # Get top 5 similar events
-            .do()
+        events = self.client.collections.get("Event")
+        results = events.query.near_text(
+            query=search_text,
+            certainty=0.85,  # Lower threshold to catch more candidates
+            limit=5  # Get top 5 similar events
         )
 
-        similar_events = results.get("data", {}).get("Get", {}).get("Event", [])
-
-        if not similar_events:
+        if len(results.objects) == 0:
             logger.info(f"   ✗ No similar events found in database")
             return False
 
-        logger.info(f"   📊 Found {len(similar_events)} similar event(s) in database")
+        logger.info(f"   📊 Found {len(results.objects)} similar event(s) in database")
+
+        # Convert to dict format for compatibility with existing code
+        similar_events = [obj.properties for obj in results.objects]
 
         # 2. Build context for LLM
         context = self._format_similar_events_for_llm(similar_events)
@@ -346,32 +330,23 @@ class WeaviateEventStore:
         Returns:
             List of event dictionaries
         """
-        results = (
-            self.client.query
-            .get("Event", [
-                "eventName", "eventDate", "eventType", "eventUrl",
-                "description", "ticketPrice", "venue", "speakers", "dateLogged"
-            ])
-            .with_limit(limit)
-            .do()
-        )
-
-        events = results.get("data", {}).get("Get", {}).get("Event", [])
+        events = self.client.collections.get("Event")
+        results = events.query.fetch_objects(limit=limit)
 
         # Convert to standard format
         return [
             {
-                "event_name": e.get("eventName"),
-                "event_date": e.get("eventDate"),
-                "event_type": e.get("eventType"),
-                "event_url": e.get("eventUrl"),
-                "description": e.get("description"),
-                "ticket_price": e.get("ticketPrice"),
-                "venue": e.get("venue"),
-                "speakers": e.get("speakers"),
-                "date_logged": e.get("dateLogged")
+                "event_name": obj.properties.get("eventName"),
+                "event_date": obj.properties.get("eventDate"),
+                "event_type": obj.properties.get("eventType"),
+                "event_url": obj.properties.get("eventUrl"),
+                "description": obj.properties.get("description"),
+                "ticket_price": obj.properties.get("ticketPrice"),
+                "venue": obj.properties.get("venue"),
+                "speakers": obj.properties.get("speakers"),
+                "date_logged": obj.properties.get("dateLogged")
             }
-            for e in events
+            for obj in results.objects
         ]
 
     def search_events(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
@@ -385,45 +360,31 @@ class WeaviateEventStore:
         Returns:
             List of matching events
         """
-        results = (
-            self.client.query
-            .get("Event", [
-                "eventName", "eventDate", "eventType", "eventUrl",
-                "description", "ticketPrice", "venue", "speakers"
-            ])
-            .with_near_text({
-                "concepts": [query]
-            })
-            .with_limit(limit)
-            .do()
+        events = self.client.collections.get("Event")
+        results = events.query.near_text(
+            query=query,
+            limit=limit
         )
-
-        events = results.get("data", {}).get("Get", {}).get("Event", [])
 
         return [
             {
-                "event_name": e.get("eventName"),
-                "event_date": e.get("eventDate"),
-                "event_type": e.get("eventType"),
-                "event_url": e.get("eventUrl"),
-                "description": e.get("description"),
-                "ticket_price": e.get("ticketPrice"),
-                "venue": e.get("venue"),
-                "speakers": e.get("speakers")
+                "event_name": obj.properties.get("eventName"),
+                "event_date": obj.properties.get("eventDate"),
+                "event_type": obj.properties.get("eventType"),
+                "event_url": obj.properties.get("eventUrl"),
+                "description": obj.properties.get("description"),
+                "ticket_price": obj.properties.get("ticketPrice"),
+                "venue": obj.properties.get("venue"),
+                "speakers": obj.properties.get("speakers")
             }
-            for e in events
+            for obj in results.objects
         ]
 
     def get_event_count(self) -> int:
         """Get total number of events in database."""
-        result = (
-            self.client.query
-            .aggregate("Event")
-            .with_meta_count()
-            .do()
-        )
-
-        return result.get("data", {}).get("Aggregate", {}).get("Event", [{}])[0].get("meta", {}).get("count", 0)
+        events = self.client.collections.get("Event")
+        # Use len() on the collection to get the count
+        return len(events)
 
     def cleanup_past_events(self) -> int:
         """
@@ -440,52 +401,25 @@ class WeaviateEventStore:
 
         # Get events with eventDate before today
         try:
-            results = (
-                self.client.query
-                .get("Event", ["eventName", "eventDate"])
-                .with_where({
-                    "path": ["eventDate"],
-                    "operator": "LessThan",
-                    "valueDate": today
-                })
-                .with_limit(1000)  # Process in batches
-                .do()
+            events = self.client.collections.get("Event")
+            results = events.query.fetch_objects(
+                filters=wvc.query.Filter.by_property("eventDate").less_than(today + "T00:00:00Z"),
+                limit=1000  # Process in batches
             )
 
-            old_events = results.get("data", {}).get("Get", {}).get("Event", [])
-
-            if not old_events:
+            if len(results.objects) == 0:
                 logger.info("No old events to clean up")
                 return 0
 
-            # Delete each old event
+            # Delete each old event using batch delete
             deleted_count = 0
-            for event in old_events:
+            for obj in results.objects:
                 try:
-                    # Get the UUID of the event
-                    event_results = (
-                        self.client.query
-                        .get("Event", ["eventName", "eventDate"])
-                        .with_where({
-                            "path": ["eventName"],
-                            "operator": "Equal",
-                            "valueText": event.get("eventName", "")
-                        })
-                        .with_additional(["id"])
-                        .with_limit(1)
-                        .do()
-                    )
-
-                    events_with_id = event_results.get("data", {}).get("Get", {}).get("Event", [])
-
-                    if events_with_id and "_additional" in events_with_id[0]:
-                        event_id = events_with_id[0]["_additional"]["id"]
-                        self.client.data_object.delete(event_id, "Event")
-                        deleted_count += 1
-                        logger.debug(f"Deleted: {event.get('eventName')} ({event.get('eventDate')})")
-
+                    events.data.delete_by_id(obj.uuid)
+                    deleted_count += 1
+                    logger.debug(f"Deleted: {obj.properties.get('eventName')} ({obj.properties.get('eventDate')})")
                 except Exception as e:
-                    logger.warning(f"Failed to delete event {event.get('eventName')}: {e}")
+                    logger.warning(f"Failed to delete event {obj.properties.get('eventName')}: {e}")
                     continue
 
             logger.info(f"✓ Cleaned up {deleted_count} past events")
@@ -506,39 +440,24 @@ class WeaviateEventStore:
         Returns:
             List of events
         """
-        results = (
-            self.client.query
-            .get("Event", [
-                "eventName", "eventDate", "eventType", "eventUrl",
-                "description", "ticketPrice", "venue", "speakers", "dateLogged"
-            ])
-            .with_where({
-                "path": ["dateLogged"],
-                "operator": "GreaterThan",
-                "valueDate": since_date
-            })
-            .with_sort([{
-                "path": ["dateLogged"],
-                "order": "desc"
-            }])
-            .with_limit(limit)
-            .do()
+        events = self.client.collections.get("Event")
+        results = events.query.fetch_objects(
+            filters=wvc.query.Filter.by_property("dateLogged").greater_than(since_date),
+            limit=limit
         )
-
-        events = results.get("data", {}).get("Get", {}).get("Event", [])
 
         return [
             {
-                "event_name": e.get("eventName"),
-                "event_date": e.get("eventDate"),
-                "event_type": e.get("eventType"),
-                "event_url": e.get("eventUrl"),
-                "description": e.get("description"),
-                "ticket_price": e.get("ticketPrice"),
-                "venue": e.get("venue"),
-                "speakers": e.get("speakers"),
-                "date_logged": e.get("dateLogged")
+                "event_name": obj.properties.get("eventName"),
+                "event_date": obj.properties.get("eventDate"),
+                "event_type": obj.properties.get("eventType"),
+                "event_url": obj.properties.get("eventUrl"),
+                "description": obj.properties.get("description"),
+                "ticket_price": obj.properties.get("ticketPrice"),
+                "venue": obj.properties.get("venue"),
+                "speakers": obj.properties.get("speakers"),
+                "date_logged": obj.properties.get("dateLogged")
             }
-            for e in events
+            for obj in results.objects
         ]
 
