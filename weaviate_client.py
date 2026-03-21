@@ -212,7 +212,7 @@ class WeaviateEventStore:
             # Fallback: Simple semantic similarity
             return self._is_duplicate_simple(event)
 
-    def _is_duplicate_simple(self, event: Dict[str, Any], similarity_threshold: float = 0.95) -> bool:
+    def _is_duplicate_simple(self, event: Dict[str, Any], similarity_threshold: float = 0.90) -> bool:
         """Simple semantic similarity check without LLM using local embeddings."""
         search_text = f"{event.get('event_name', '')} {event.get('description', '')}"
 

@@ -72,7 +72,7 @@ variable "event_finder_cpu" {
 variable "event_finder_memory" {
   description = "Memory for event-finder container in MB"
   type        = number
-  default     = 512 # 0.5 GB
+  default     = 1024 # 1 GB (increased for local embedding model)
 }
 
 # Total task CPU and memory (must be valid Fargate combination)
@@ -86,7 +86,7 @@ variable "task_cpu" {
 variable "task_memory" {
   description = "Total memory for the task (sum of all containers)"
   type        = string
-  default     = "2048" # 2 GB
+  default     = "3072" # 3 GB (1GB Weaviate + 1GB event-finder + 1GB buffer)
 }
 
 # Scheduling
@@ -136,7 +136,7 @@ variable "event_finder_image_tag" {
 variable "weaviate_image" {
   description = "Weaviate Docker image"
   type        = string
-  default     = "semitechnologies/weaviate:1.23.7"
+  default     = "semitechnologies/weaviate:1.27.5"
 }
 
 
