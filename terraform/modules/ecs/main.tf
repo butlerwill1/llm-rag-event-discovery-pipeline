@@ -116,6 +116,10 @@ resource "aws_ecs_task_definition" "main" {
         {
           containerPort = 8080
           protocol      = "tcp"
+        },
+        {
+          containerPort = 50051
+          protocol      = "tcp"
         }
       ]
 
@@ -163,10 +167,10 @@ resource "aws_ecs_task_definition" "main" {
 
       healthCheck = {
         command     = ["CMD-SHELL", "wget --spider -q http://localhost:8080/v1/.well-known/ready || exit 1"]
-        interval    = 10
-        timeout     = 5
+        interval    = 15
+        timeout     = 10
         retries     = 5
-        startPeriod = 30
+        startPeriod = 90
       }
 
       logConfiguration = {
