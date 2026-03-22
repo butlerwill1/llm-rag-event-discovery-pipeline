@@ -313,8 +313,4 @@ Monthly costs (assuming weekly execution):
 - Slack/Discord notification integration
 - Advanced filtering (price range, event type, venue)
 
-## License
-
-MIT License - see LICENSE file for details
-
 
