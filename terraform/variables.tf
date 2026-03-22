@@ -93,7 +93,7 @@ variable "task_memory" {
 variable "schedule_expression" {
   description = "EventBridge schedule expression (cron or rate)"
   type        = string
-  default     = "cron(0 9 * * ? *)" # 9 AM UTC daily
+  default     = "cron(0 9 ? * 1 *)"
 }
 
 # Networking

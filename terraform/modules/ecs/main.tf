@@ -110,7 +110,7 @@ resource "aws_ecs_task_definition" "main" {
       image     = var.weaviate_image
       cpu       = var.weaviate_cpu
       memory    = var.weaviate_memory
-      essential = true
+      essential = false # Non-essential: will be stopped when event-finder exits
 
       portMappings = [
         {
@@ -177,7 +177,7 @@ resource "aws_ecs_task_definition" "main" {
       image     = var.event_finder_image
       cpu       = var.event_finder_cpu
       memory    = var.event_finder_memory
-      essential = false # Allow task to complete when this container exits
+      essential = true # Task stops when this container exits
 
       # Wait for Weaviate to be healthy before starting
       dependsOn = [
