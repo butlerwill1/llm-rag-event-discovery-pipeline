@@ -3,6 +3,12 @@ name: Deploy London Events AI Agent
 on:
   push:
     branches: [main]
+    paths-ignore:
+      # Skip deployment when only these files/folders change
+      - 'terraform/**'           # Infrastructure changes don't need Docker rebuild
+      - 'guides/**'              # Documentation changes
+      - '*.md'                   # Markdown files (README, ARCHITECTURE, etc.)
+      - '.github/**'             # Workflow changes (except this file triggers itself)
   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 env:
