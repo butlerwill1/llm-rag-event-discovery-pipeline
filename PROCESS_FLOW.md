@@ -1,453 +1,538 @@
-# 🔄 Complete Process Flow - File by File
+# Process Flow Documentation
 
-This document explains how each file works and how they interact with each other.
-
----
-
-## 📋 File Overview
-
-| File | Purpose | Called By | Calls |
-|------|---------|-----------|-------|
-| **main.py** | Orchestrates entire process | User/Docker | All other files |
-| **config.py** | Loads environment variables | main.py, others | os.getenv() |
-| **query_loader.py** | Manages search queries | main.py | queries.txt |
-| **openai_client.py** | Calls OpenAI API for search | main.py | OpenAI API |
-| **event_parser.py** | Parses OpenAI responses | main.py | None |
-| **weaviate_client.py** | Vector DB operations | main.py | Weaviate, OpenAI |
-| **email_service.py** | Sends email digests | main.py | AWS SES |
-| **rag_query.py** | Interactive RAG queries | User (CLI) | weaviate_client.py |
+Detailed execution flow and component interactions for the Event Discovery RAG Pipeline.
 
 ---
 
-## 🚀 Step-by-Step Process Flow
+## File Overview
 
-### **Step 1: Initialization** (main.py)
+| File | Purpose | Dependencies |
+|------|---------|--------------|
+| **main.py** | Orchestration and execution flow | All components |
+| **config.py** | Environment configuration | python-dotenv |
+| **query_loader.py** | Query file management | queries.txt |
+| **openai_client.py** | GPT-5 agentic web search | OpenAI SDK |
+| **event_parser.py** | JSON response parsing | json, logging |
+| **weaviate_client.py** | Vector database operations | Weaviate v4, sentence-transformers, OpenAI |
+| **email_service.py** | Email digest generation | boto3 (AWS SES) |
 
+---
+
+## Execution Flow
+
+### Step 1: Container Initialization
+
+**ECS Task Startup:**
+1. EventBridge triggers ECS task at scheduled time (Sunday 9 AM UTC)
+2. ECS starts both containers:
+   - Weaviate container (essential=false)
+   - Event Finder container (essential=true)
+3. Event Finder waits for Weaviate health check
+
+**Component Initialization (main.py):**
 ```python
-# File: main.py
-def main():
-    # 1.1: Load environment variables
-    from config import QUERIES_FILE  # Reads .env file
-    
-    # 1.2: Connect to Weaviate
-    weaviate_store = WeaviateEventStore()  # weaviate_client.py
-    
-    # 1.3: Load search queries
-    queries = load_queries()  # query_loader.py → queries.txt
+# Load configuration
+from config import QUERIES_FILE, OPENAI_API_KEY, AWS_REGION
+
+# Connect to Weaviate
+weaviate_store = WeaviateEventStore()
+# - Connects to localhost:8080 (Weaviate container)
+# - Loads local embedding model (all-MiniLM-L6-v2)
+# - Ensures Event collection schema exists
+
+# Load search queries
+queries = load_queries()  # Reads queries.txt
 ```
 
-**Files involved:**
-- `config.py` - Loads `OPENAI_API_KEY`, `WEAVIATE_URL`, etc.
-- `weaviate_client.py` - Connects to Weaviate on port 8080
-- `query_loader.py` - Reads `queries.txt`
+**Key Operations:**
+- Environment variable loading via python-dotenv
+- Weaviate connection with health check retry logic
+- Local embedding model pre-loaded from Docker image layer
+- Schema validation and creation if needed
 
 ---
 
-### **Step 2: Cleanup Old Events** (main.py → weaviate_client.py)
+### Step 2: Data Cleanup
 
+**Remove Past Events:**
 ```python
-# File: main.py
 deleted_count = weaviate_store.cleanup_past_events()
 ```
 
-**What happens:**
-1. `weaviate_client.py` gets today's date
-2. Queries Weaviate for events where `eventDate < today`
-3. Deletes each old event by UUID
-4. Returns count of deleted events
+**Implementation (weaviate_client.py):**
+1. Get current date
+2. Query Weaviate: `eventDate < today`
+3. Delete each past event by UUID
+4. Return count of deleted events
 
-**Files involved:**
-- `weaviate_client.py` - `cleanup_past_events()` method
+**Purpose:**
+- Reduce storage costs
+- Keep database focused on future events
+- Prevent stale data accumulation
 
 ---
 
-### **Step 3: Search for Events** (main.py → openai_client.py)
+### Step 3: Event Discovery
 
+**Agentic Web Search (openai_client.py):**
 ```python
-# File: main.py
 for query in queries:
-    client = EventSearchClient()  # openai_client.py
+    client = EventSearchClient()
     response = client.search_events(query)
 ```
 
-**What happens in openai_client.py:**
+**OpenAI Responses API Call:**
 ```python
-# File: openai_client.py
-def search_events(self, query: str):
-    # 3.1: Build prompt
-    prompt = f"Find London tech events for: {query}"
-    
-    # 3.2: Call OpenAI API
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"}
-    )
-    
-    # 3.3: Return raw JSON response
-    return response.choices[0].message.content
+response = self.client.responses.create(
+    model="gpt-5",
+    input=formatted_prompt,
+    reasoning={"effort": "medium"},
+    tools=[{
+        "type": "web_search",
+        "search_context_size": "high",
+        "user_location": {
+            "type": "approximate",
+            "country": "GB",
+            "city": "London"
+        }
+    }]
+)
 ```
 
-**Files involved:**
-- `openai_client.py` - Calls OpenAI API with web search
-- `config.py` - Provides `MODEL_NAME`, `OPENAI_API_KEY`
+**What GPT-5 Does:**
+1. Plans multi-step search strategy
+2. Searches event platforms (Eventbrite, Meetup, Luma)
+3. Cross-references information from multiple sources
+4. Filters by date constraints (future events only)
+5. Extracts structured data (name, date, venue, pricing)
+6. Returns JSON array of events
+
+**Key Features:**
+- Reasoning-based search planning
+- Geographic context (London)
+- High search context for detailed information
+- Structured JSON output
 
 ---
 
-### **Step 4: Parse Events** (main.py → event_parser.py)
+### Step 4: Response Parsing
 
+**Parse JSON Response (event_parser.py):**
 ```python
-# File: main.py
+# main.py
 events = parse_openai_response(response)  # event_parser.py
 ```
 
-**What happens in event_parser.py:**
+**Parsing Logic (event_parser.py):**
 ```python
-# File: event_parser.py
 def parse_openai_response(response: str):
-    # 4.1: Parse JSON
+    # Parse JSON string
     data = json.loads(response)
-    
-    # 4.2: Extract events array
-    events = data.get("events", [])
-    
-    # 4.3: Validate and normalize each event
+
+    # Extract events array
+    events = data if isinstance(data, list) else data.get("events", [])
+
+    # Validate and normalize
+    validated_events = []
     for event in events:
-        # Ensure required fields exist
-        event.setdefault("event_name", "Unknown")
-        event.setdefault("event_date", "TBA")
-        # ... etc
-    
-    return events
+        if validate_event_structure(event):
+            validated_events.append(event)
+
+    return validated_events
 ```
 
-**Files involved:**
-- `event_parser.py` - Parses and validates event data
+**Validation:**
+- Ensures required fields exist (name, date, URL)
+- Normalizes date formats
+- Filters out malformed events
+- Logs parsing errors
 
 ---
 
-### **Step 5: Deduplicate Events** (main.py → weaviate_client.py)
+### Step 5: RAG-Powered Deduplication
 
-```python
-# File: main.py
-for event in all_new_events:
-    if not weaviate_store.is_duplicate(event):
-        # Add event
-```
+**Hybrid Deduplication Strategy:**
 
-**What happens in weaviate_client.py:**
+**Phase 1: Fast Path (Exact URL Match)**
 ```python
-# File: weaviate_client.py
+# weaviate_client.py
 def is_duplicate(self, event):
-    # 5.1: Fast path - Check exact URL match
-    if url_exists_in_db(event['event_url']):
-        return True  # Duplicate!
-    
-    # 5.2: RAG-powered check
-    return self._is_duplicate_with_llm(event)
-
-def _is_duplicate_with_llm(self, event):
-    # 5.3: Retrieve similar events (vector search)
-    similar_events = weaviate.query.get("Event").with_near_text({
-        "concepts": [f"{event['event_name']} {event['description']}"],
-        "certainty": 0.85
-    }).with_limit(5).do()
-    
-    # 5.4: Ask LLM to decide
-    prompt = f"""
-    New Event: {event}
-    Similar Events: {similar_events}
-    Is this a duplicate? Answer JSON: {{"is_duplicate": bool, "reason": str}}
-    """
-    
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"}
+    # Check for exact URL match
+    results = events.query.fetch_objects(
+        filters=Filter.by_property("eventUrl").equal(event["event_url"]),
+        limit=1
     )
-    
-    result = json.loads(response.choices[0].message.content)
-    return result["is_duplicate"]
+    if len(results.objects) > 0:
+        return True  # Duplicate found
 ```
 
-**Files involved:**
-- `weaviate_client.py` - Deduplication logic
-- `openai_client.py` (indirectly) - LLM decision via OpenAI API
+**Phase 2: Semantic Search (Local Embeddings)**
+```python
+# Generate embedding for new event
+search_text = f"{event['event_name']} {event['description']}"
+query_vector = self.embedding_model.encode(search_text).tolist()
+
+# Vector similarity search
+results = events.query.near_vector(
+    near_vector=query_vector,
+    certainty=0.85,  # 85% similarity threshold
+    limit=5  # Get top 5 candidates
+)
+```
+
+**Phase 3: LLM Analysis (GPT-4o)**
+```python
+# Build context from retrieved events
+context = format_similar_events_for_llm(similar_events)
+
+# Ask GPT-4o to make final decision
+prompt = f"""
+New Event: {event details}
+Similar Events in Database: {context}
+
+Rules:
+1. Same name + same date = DUPLICATE
+2. Same URL = DUPLICATE
+3. Similar name but different date = NOT duplicate (recurring event)
+4. Similar topic but different venue = NOT duplicate
+
+Answer JSON: {{"is_duplicate": bool, "reason": str}}
+"""
+
+response = openai.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": prompt}],
+    response_format={"type": "json_object"},
+    temperature=0.1  # Low temperature for consistency
+)
+```
+
+**Why This Approach:**
+- Fast path catches obvious duplicates (same URL)
+- Vector search finds semantic similarities
+- LLM provides nuanced decision-making (recurring events, similar topics)
+- Higher accuracy than threshold-based similarity alone
 
 ---
 
-### **Step 6: Add New Events** (main.py → weaviate_client.py)
+### Step 6: Event Storage
 
+**Add New Event (weaviate_client.py):**
 ```python
-# File: main.py
-event['date_logged'] = datetime.now().isoformat()
-weaviate_store.add_event(event)
-newly_added_events.append(event)
-```
-
-**What happens in weaviate_client.py:**
-```python
-# File: weaviate_client.py
 def add_event(self, event):
-    # 6.1: Prepare data object
-    data_object = {
-        "eventName": event['event_name'],
-        "eventDate": event['event_date'],
-        "eventType": event['event_type'],
-        "eventUrl": event['event_url'],
-        "description": event['description'],
-        # ... all fields
+    # Prepare properties
+    properties = {
+        "eventName": event.get("event_name", ""),
+        "eventDate": to_rfc3339(event.get("event_date", "")),
+        "eventType": event.get("event_type", ""),
+        "eventUrl": event.get("event_url", ""),
+        "description": event.get("description", ""),
+        "ticketPrice": event.get("ticket_price", ""),
+        "venue": event.get("venue", ""),
+        "speakers": event.get("speakers", ""),
+        "dateLogged": to_rfc3339(datetime.now().isoformat())
     }
-    
-    # 6.2: Add to Weaviate (auto-generates embedding)
-    self.client.data_object.create(
-        data_object=data_object,
-        class_name="Event"
+
+    # Generate embedding locally (no API cost!)
+    text_to_embed = f"{event['event_name']} {event['description']} {event['event_type']} {event['venue']}"
+    vector = self.embedding_model.encode(text_to_embed).tolist()
+
+    # Store in Weaviate with vector
+    events = self.client.collections.get("Event")
+    uuid = events.data.insert(
+        properties=properties,
+        vector=vector
     )
-    # Weaviate automatically:
-    # - Generates embedding via OpenAI text-embedding-3-small
-    # - Stores in vector database
-    # - Indexes for semantic search
+
+    # Weaviate immediately writes to WAL on EFS
+    return uuid
 ```
 
-**Files involved:**
-- `weaviate_client.py` - Adds event to vector DB
-- Weaviate service - Generates embeddings via OpenAI
+**Key Features:**
+- Local embedding generation (all-MiniLM-L6-v2)
+- No OpenAI embedding API costs
+- Immediate WAL persistence to EFS
+- 384-dimensional vectors
 
 ---
 
-### **Step 7: Generate Summary** (main.py → weaviate_client.py)
+### Step 7: Email Digest Generation
 
+**Format and Send Email (email_service.py):**
 ```python
-# File: main.py
-total_events = weaviate_store.get_event_count()
-all_events = weaviate_store.get_all_events(limit=100)
-
-# Count event types
-event_types = {}
-for event in all_events:
-    event_type = event.get('event_type', 'unknown')
-    event_types[event_type] = event_types.get(event_type, 0) + 1
-```
-
-**What happens in weaviate_client.py:**
-```python
-# File: weaviate_client.py
-def get_event_count(self):
-    result = self.client.query.aggregate("Event").with_meta_count().do()
-    return result["data"]["Aggregate"]["Event"][0]["meta"]["count"]
-
-def get_all_events(self, limit=100):
-    results = self.client.query.get("Event", [
-        "eventName", "eventDate", "eventType", ...
-    ]).with_limit(limit).do()
-    
-    return results["data"]["Get"]["Event"]
-```
-
-**Files involved:**
-- `weaviate_client.py` - Queries Weaviate for statistics
-
----
-
-### **Step 8: Send Email** (main.py → email_service.py)
-
-```python
-# File: main.py
+# main.py
 email_service = create_email_service_from_env()
-email_sent = email_service.send_weekly_digest(newly_added_events, total_events)
+email_sent = email_service.send_weekly_digest(
+    newly_added_events,
+    total_event_count
+)
 ```
 
-**What happens in email_service.py:**
+**Email Service Implementation:**
 ```python
-# File: email_service.py
+# email_service.py
 def send_weekly_digest(self, events, total_count):
-    # 8.1: Build HTML email
-    html_body = f"""
-    <h1>🎯 {len(events)} New London Tech Events</h1>
-    <ul>
-    """
-    
-    for event in events:
-        html_body += f"""
-        <li>
-            <strong>{event['event_name']}</strong><br>
-            📅 {event['event_date']}<br>
-            📍 {event.get('venue', 'TBA')}<br>
-            <a href="{event['event_url']}">Details</a>
-        </li>
-        """
-    
-    html_body += "</ul>"
-    
-    # 8.2: Send via AWS SES
-    ses_client = boto3.client('ses', region_name='eu-west-1')
-    ses_client.send_email(
-        Source=self.from_email,
+    # Build HTML email body
+    html_body = build_html_template(events, total_count)
+
+    # Send via AWS SES
+    ses_client = boto3.client('ses', region_name=self.aws_region)
+    response = ses_client.send_email(
+        Source=self.from_email,  # Must be verified in SES
         Destination={'ToAddresses': [self.to_email]},
         Message={
-            'Subject': {'Data': f'🎯 {len(events)} New Events'},
-            'Body': {'Html': {'Data': html_body}}
+            'Subject': {
+                'Data': f'New London Events - {len(events)} Found'
+            },
+            'Body': {
+                'Html': {'Data': html_body}
+            }
         }
     )
+
+    return response['MessageId']
 ```
 
-**Files involved:**
-- `email_service.py` - Formats and sends email
-- `config.py` - Provides `SES_FROM_EMAIL`, `SES_TO_EMAIL`, `AWS_REGION`
-- AWS SES - Sends email
+**Email Content:**
+- Summary of new events found
+- Event details (name, date, venue, pricing)
+- Direct links to event pages
+- Total events in database
+- Professional HTML formatting
 
 ---
 
-## 🔍 Alternative Flow: RAG Query (rag_query.py)
+### Step 8: Container Shutdown
 
-This is a separate tool for querying stored events:
+**Graceful Termination:**
+```python
+# main.py (finally block)
+finally:
+    # Clean up Weaviate connection
+    if weaviate_store is not None:
+        try:
+            weaviate_store.client.close()
+            logger.info("Weaviate connection closed")
+        except Exception as e:
+            logger.warning(f"Error closing connection: {e}")
+```
 
+**ECS Task Lifecycle:**
+1. Event Finder container exits (code 0)
+2. ECS detects essential container stopped
+3. ECS sends SIGTERM to Weaviate container
+4. Weaviate flushes WAL to EFS (30-second timeout)
+5. ECS sends SIGKILL if needed
+6. Task terminates
+7. Data persisted on EFS for next run
+
+**Data Safety:**
+- WAL already flushed during event storage
+- 30-second grace period for final cleanup
+- EFS ensures durability
+- No data loss on shutdown
+
+---
+
+## Key Technical Concepts
+
+### Document-Level RAG (No Chunking)
+
+This system uses **document-level RAG** rather than chunk-based RAG:
+
+**Storage:**
+- Each event = 1 vector (384 dimensions)
+- No chunking needed (events are small, self-contained)
+- Concatenate key fields: name + description + type + venue
+
+**Retrieval:**
+- Vector similarity search returns whole events
+- Top 5 similar events passed to LLM
+- LLM analyzes complete event context
+
+**Why No Chunking:**
+- Events are short (~100-300 words)
+- Each event is semantically distinct
+- Chunking would lose holistic meaning
+- More efficient: 1 vector per event vs. multiple chunks
+
+### Local vs. API Embeddings
+
+**Local Embeddings (all-MiniLM-L6-v2):**
+- Generated on-device (no API calls)
+- 384 dimensions
+- Fast inference (~10ms per event)
+- Zero cost
+- Pre-loaded in Docker image
+
+**Cost Comparison:**
+- OpenAI embeddings: $0.00002 per 1K tokens
+- Local embeddings: $0.00 (free)
+- For 100 events/week: ~$0.10/month saved
+
+### Write-Ahead-Log (WAL) Persistence
+
+**How It Works:**
+1. Event added to Weaviate
+2. Write to WAL on EFS (append-only)
+3. Acknowledge to client
+4. Update in-memory index
+5. Periodic segment flush
+
+**Recovery:**
+- On startup, check WAL status
+- Replay incomplete WAL entries
+- Load completed segments
+- Ready for queries
+
+**Guarantees:**
+- Every acknowledged write is durable
+- Crash-safe (WAL on persistent storage)
+- Fast writes (append-only)
+- Automatic recovery
+
+## Component Interactions
+
+### main.py (Orchestrator)
+**Calls:**
+- `config.py` - Load environment variables
+- `query_loader.py` - Load search queries
+- `openai_client.py` - Perform web search
+- `event_parser.py` - Parse JSON responses
+- `weaviate_client.py` - Deduplication and storage
+- `email_service.py` - Send digest
+
+### weaviate_client.py (Vector Database)
+**Calls:**
+- Local embedding model (sentence-transformers)
+- OpenAI GPT-4o (for deduplication decisions)
+- Weaviate database (localhost:8080)
+
+**Provides:**
+- Event storage with vectors
+- Duplicate detection (URL + RAG)
+- Semantic search
+- Event retrieval
+
+### openai_client.py (Web Search)
+**Calls:**
+- OpenAI Responses API (GPT-5)
+- Web search tool
+
+**Provides:**
+- Agentic event discovery
+- Structured JSON output
+- Multi-step search execution
+
+### email_service.py (Notifications)
+**Calls:**
+- AWS SES (boto3)
+
+**Provides:**
+- HTML email formatting
+- Digest delivery
+
+---
+
+## Configuration
+
+### Environment Variables (.env)
 ```bash
-python rag_query.py "What AI events are happening?"
+# OpenAI
+OPENAI_API_KEY=sk-...
+MODEL_NAME=gpt-5
+REASONING_EFFORT=medium
+
+# AWS
+AWS_REGION=eu-west-1
+SES_FROM_EMAIL=verified@example.com
+SES_TO_EMAIL=recipient@example.com
+
+# Weaviate (Docker)
+WEAVIATE_HOST=localhost
+WEAVIATE_PORT=8080
+WEAVIATE_GRPC_PORT=50051
 ```
 
-**What happens:**
-```python
-# File: rag_query.py
-def main():
-    # 1: Connect to Weaviate
-    store = WeaviateEventStore()
-    
-    # 2: Search for relevant events
-    events = store.search_events(query, limit=5)
-    
-    # 3: Build context
-    context = format_events_for_llm(events)
-    
-    # 4: Ask LLM to answer question
-    prompt = f"""
-    Events in database:
-    {context}
-    
-    Question: {query}
-    Answer based on the events above.
-    """
-    
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    print(response.choices[0].message.content)
+### Search Queries (queries.txt)
 ```
-
-**Files involved:**
-- `rag_query.py` - RAG query tool
-- `weaviate_client.py` - Searches events
-- OpenAI API - Generates answer
-
----
-
-## 📊 Data Flow Summary
-
-```
-User Input (queries.txt)
-    ↓
-OpenAI API (web search)
-    ↓
-Raw JSON Response
-    ↓
-event_parser.py (parse & validate)
-    ↓
-Structured Events
-    ↓
-weaviate_client.py (deduplicate via RAG)
-    ↓
-New Events Only
-    ↓
-Weaviate Vector DB (store with embeddings)
-    ↓
-email_service.py (format & send)
-    ↓
-AWS SES (deliver email)
-    ↓
-User's Inbox ✉️
+London AI hackathons
+# Lines starting with # are comments
+# Add one query per line
 ```
 
 ---
 
-## 🎯 Key Interactions
+## Deployment Architecture
 
-### **main.py ↔ weaviate_client.py**
-- Most important relationship
-- main.py calls weaviate_client for all storage operations
-- weaviate_client handles deduplication, storage, retrieval
-
-### **weaviate_client.py ↔ OpenAI API**
-- Generates embeddings for vector search
-- LLM decisions for deduplication
-- Two different models: `text-embedding-3-small` and `gpt-4o`
-
-### **main.py ↔ openai_client.py**
-- One-way: main.py calls openai_client
-- openai_client searches web for events
-- Returns raw JSON
-
-### **main.py ↔ event_parser.py**
-- One-way: main.py calls event_parser
-- Converts raw JSON to structured Python dicts
-- Validates and normalizes data
-
-### **main.py ↔ email_service.py**
-- One-way: main.py calls email_service
-- Passes newly added events
-- email_service formats and sends
-
----
-
-## 🔧 Configuration Files
-
-### **config.py**
-```python
-# Loads from .env file
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o")
-WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
-SES_FROM_EMAIL = os.getenv("SES_FROM_EMAIL")
-SES_TO_EMAIL = os.getenv("SES_TO_EMAIL")
-AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
-QUERIES_FILE = "queries.txt"
-```
-
-### **queries.txt**
-```
-London AI events this week
-London hackathons in March
-Tech meetups in Shoreditch
-```
-
----
-
-## 🐳 Docker Flow
-
-When running in Docker:
-
+### Local Development
 ```
 docker-compose up
-    ↓
-Starts two services:
-    1. weaviate (vector database)
-    2. event-finder (Python app)
-    ↓
-event-finder waits for weaviate to be healthy
-    ↓
-Runs: python main.py
-    ↓
-(Same flow as above)
+  ├── Weaviate container (port 8080)
+  └── Event Finder container
+      └── python main.py
 ```
 
-**Files involved:**
-- `docker-compose.yml` - Orchestrates services
-- `Dockerfile` - Builds Python app image
-- `requirements.txt` - Python dependencies
+### Production (AWS ECS)
+```
+EventBridge Scheduler (Sunday 9 AM UTC)
+  ↓
+ECS Fargate Task
+  ├── Weaviate container (essential=false)
+  │   └── EFS mount: /var/lib/weaviate
+  └── Event Finder container (essential=true)
+      ├── Pulls from ECR
+      ├── Connects to Weaviate (localhost)
+      ├── Calls OpenAI API
+      ├── Sends email via SES
+      └── Exits → Task terminates
+```
+
+### CI/CD Pipeline
+```
+git push origin main
+  ↓
+GitHub Actions
+  ├── Build Docker image
+  ├── Push to ECR
+  └── ECS uses new image on next scheduled run
+```
+
+**Path-based filtering:**
+- Changes to `terraform/` → No build
+- Changes to `guides/` → No build
+- Changes to `*.md` → No build
+- Changes to `*.py` → Build and deploy
 
 ---
 
-This is the complete process flow! Each file has a specific responsibility and they work together to find, deduplicate, store, and email London tech events.
+## Summary
+
+This pipeline demonstrates a production-grade RAG system with:
+
+**Technical Highlights:**
+- Multi-model AI strategy (GPT-5 for search, GPT-4o for deduplication)
+- Local embeddings for cost optimization
+- Hybrid deduplication (URL + vector + LLM)
+- Serverless architecture with ECS Fargate
+- Infrastructure as Code with Terraform
+- CI/CD with GitHub Actions
+- Persistent storage with EFS and WAL
+- Graceful container lifecycle management
+
+**Data Engineering Practices:**
+- Vector database for semantic search
+- Document-level RAG (no chunking needed)
+- Write-Ahead-Log for durability
+- Automated data cleanup
+- Structured logging and monitoring
+
+**Cost Optimization:**
+- Local embeddings (zero API cost)
+- Scheduled execution (no idle compute)
+- Path-based CI/CD filtering
+- 7-day log retention
+- Efficient Docker image caching
+
+For architecture diagrams and visual representations, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 

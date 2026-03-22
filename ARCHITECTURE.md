@@ -1,299 +1,313 @@
-# 🏗️ System Architecture & Process Flow
+# System Architecture
 
-This document provides a visual overview of how the London Events AI Agent works.
+Technical architecture documentation for the Event Discovery RAG Pipeline.
 
----
+## AI Model Strategy
 
-## 🤖 AI Model Strategy
+The system uses a multi-model approach optimized for different tasks:
 
-The system uses **two different AI models** optimized for different tasks:
+| Component | Model | Purpose |
+|-----------|-------|---------|
+| **Event Discovery** | GPT-5 with web search | Agentic search with reasoning capabilities for multi-step event discovery |
+| **Deduplication** | GPT-4o | Fast, cost-effective LLM for semantic duplicate detection |
+| **Embeddings** | all-MiniLM-L6-v2 | Local embedding generation (384 dimensions, no API costs) |
 
-| Task | Model | Reasoning |
-|------|-------|-----------|
-| **Event Discovery** | `gpt-5` | Agentic search with reasoning - can plan and execute multiple searches for comprehensive event discovery |
-| **Deduplication** | `gpt-4o` | Fast, cost-effective - simple comparison task doesn't need reasoning capabilities |
-| **Embeddings** | `text-embedding-3-small` | Efficient vector embeddings for semantic search |
-
-**Why this approach?**
-- ✅ **Cost-effective**: Use expensive reasoning models only where needed
-- ✅ **Performance**: gpt-4o is faster for simple tasks
-- ✅ **Quality**: gpt-5 provides superior event discovery through agentic search
+This architecture balances cost, performance, and quality by using reasoning models only where needed and eliminating embedding API costs through local generation.
 
 ---
 
-## 🔄 Complete Process Flow
+## Complete Process Flow
 
 ```mermaid
 graph TD
-    Start([User runs: python main.py]) --> Main[main.py]
-    
-    Main --> Init[Initialize Components]
-    Init --> Config[config.py: Load env vars]
-    Init --> Weaviate[weaviate_client.py: Connect to Weaviate]
-    Init --> QueryLoad[query_loader.py: Load queries.txt]
-    
-    QueryLoad --> Queries[queries.txt: List of search queries]
-    
-    Main --> Cleanup[Cleanup Past Events]
-    Cleanup --> WeavClean[weaviate_client.cleanup_past_events]
-    WeavClean --> DeleteOld[Delete events where eventDate < today]
-    
-    Main --> Search[Search for Events]
+    Start([ECS Task Starts]) --> Init[Initialize Components]
+
+    Init --> Weaviate[Connect to Weaviate]
+    Init --> LoadModel[Load Local Embedding Model]
+    Init --> QueryLoad[Load queries.txt]
+
+    Weaviate --> HealthCheck{Weaviate Healthy?}
+    HealthCheck -->|No| Wait[Wait & Retry]
+    Wait --> HealthCheck
+    HealthCheck -->|Yes| Cleanup[Cleanup Past Events]
+
+    Cleanup --> DeleteOld[Delete events where eventDate < today]
+    DeleteOld --> Search[Search for Events]
+
     Search --> Loop{For each query}
-    
-    Loop --> OpenAI[openai_client.py: Call OpenAI API]
-    OpenAI --> WebSearch[OpenAI searches web for events]
-    WebSearch --> Response[Raw JSON response]
-    
-    Response --> Parser[event_parser.py: Parse response]
-    Parser --> Extract[Extract structured event data]
-    Extract --> Events[List of event dictionaries]
-    
+
+    Loop --> GPT5[GPT-5 Agentic Web Search]
+    GPT5 --> WebSearch[Multi-step search across platforms]
+    WebSearch --> Response[Structured JSON response]
+
+    Response --> Parser[Parse & Validate Events]
+    Parser --> Events[List of event objects]
+
     Events --> Dedupe{For each event}
-    
-    Dedupe --> CheckDup[weaviate_client.is_duplicate]
-    CheckDup --> URLCheck{Exact URL match?}
+
+    Dedupe --> URLCheck{Exact URL match?}
     URLCheck -->|Yes| Skip1[Skip - Duplicate]
-    URLCheck -->|No| RAG[RAG-Powered Check]
-    
-    RAG --> Retrieve[Retrieve top 5 similar events]
-    Retrieve --> LLM[Ask GPT-4o: Is this duplicate?]
-    LLM --> Decision{LLM Decision}
-    
-    Decision -->|Duplicate| Skip2[Skip - Duplicate]
-    Decision -->|Not Duplicate| Add[weaviate_client.add_event]
-    
-    Add --> Embed[Generate embedding via OpenAI]
-    Embed --> Store[Store in Weaviate vector DB]
-    Store --> Track[Add to newly_added_events list]
-    
+    URLCheck -->|No| VectorSearch[Generate Local Embedding]
+
+    VectorSearch --> Retrieve[Vector similarity search]
+    Retrieve --> Candidates[Top 5 similar events]
+    Candidates --> LLM[GPT-4o Duplicate Analysis]
+    LLM --> Decision{Is Duplicate?}
+
+    Decision -->|Yes| Skip2[Skip - Duplicate]
+    Decision -->|No| AddEvent[Generate Embedding]
+
+    AddEvent --> Store[Store in Weaviate with Vector]
+    Store --> Track[Add to new events list]
+
     Skip1 --> Next1{More events?}
     Skip2 --> Next1
     Track --> Next1
-    
+
     Next1 -->|Yes| Dedupe
-    Next1 -->|No| Summary[Generate Summary]
-    
-    Summary --> Count[weaviate_client.get_event_count]
-    Summary --> GetAll[weaviate_client.get_all_events]
-    Summary --> Display[Display statistics]
-    
-    Display --> Email[Send Email Digest]
-    Email --> EmailSvc[email_service.py]
-    EmailSvc --> Format[Format HTML email]
-    Format --> SES[Send via AWS SES]
-    SES --> Done([Complete])
-    
-    style Main fill:#4A90E2,color:#fff
+    Next1 -->|No| Email[Format Email Digest]
+
+    Email --> SES[Send via AWS SES]
+    SES --> Exit[Container Exits]
+    Exit --> TaskStop[ECS Task Terminates]
+    TaskStop --> WALFlush[Weaviate Flushes WAL to EFS]
+    WALFlush --> Done([Complete])
+
+    style Init fill:#4A90E2,color:#fff
     style Weaviate fill:#E27D60,color:#fff
-    style OpenAI fill:#85CDCA,color:#000
-    style Parser fill:#E8A87C,color:#000
+    style GPT5 fill:#85CDCA,color:#000
     style LLM fill:#C38D9E,color:#fff
-    style EmailSvc fill:#41B3A3,color:#fff
+    style SES fill:#41B3A3,color:#fff
 ```
 
 ---
 
-## 📦 Component Architecture
+## AWS Infrastructure Architecture
 
 ```mermaid
-graph LR
-    subgraph "User Interface"
-        CLI[Command Line]
-        Docker[Docker Compose]
+graph TB
+    subgraph "AWS Cloud"
+        subgraph "Scheduling"
+            EB[EventBridge Scheduler<br/>Cron: Sunday 9 AM UTC]
+        end
+
+        subgraph "Compute - ECS Fargate"
+            Task[ECS Task]
+            subgraph "Containers"
+                App[Event Finder Container<br/>essential=true]
+                DB[Weaviate Container<br/>essential=false]
+            end
+        end
+
+        subgraph "Storage"
+            ECR[ECR Repository<br/>Docker Images]
+            EFS[EFS Volume<br/>Weaviate Data + WAL]
+        end
+
+        subgraph "Networking"
+            VPC[VPC]
+            SG[Security Group]
+            Subnet[Public Subnets]
+        end
+
+        subgraph "Monitoring"
+            CW[CloudWatch Logs<br/>7-day retention]
+        end
+
+        subgraph "Email"
+            SES[AWS SES<br/>Email Delivery]
+        end
     end
-    
-    subgraph "Application Layer"
-        Main[main.py<br/>Orchestrator]
-        Query[query_loader.py<br/>Query Manager]
-        Parser[event_parser.py<br/>JSON Parser]
+
+    subgraph "External"
+        OpenAI[OpenAI API<br/>GPT-5 + GPT-4o]
     end
-    
-    subgraph "AI Services"
-        OpenAI[openai_client.py<br/>Web Search]
-        Weaviate[weaviate_client.py<br/>Vector DB Client]
-    end
-    
-    subgraph "External Services"
-        GPT[OpenAI API<br/>GPT-4o + Embeddings]
-        VectorDB[(Weaviate<br/>Vector Database)]
-        SES[AWS SES<br/>Email Service]
-    end
-    
-    subgraph "Output"
-        Email[email_service.py<br/>Email Formatter]
-        Inbox[📧 User Inbox]
-    end
-    
-    CLI --> Main
-    Docker --> Main
-    Main --> Query
-    Main --> OpenAI
-    Main --> Parser
-    Main --> Weaviate
-    Main --> Email
-    
-    OpenAI --> GPT
-    Weaviate --> GPT
-    Weaviate --> VectorDB
-    Email --> SES
-    SES --> Inbox
-    
-    style Main fill:#4A90E2,color:#fff
-    style Weaviate fill:#E27D60,color:#fff
-    style OpenAI fill:#85CDCA,color:#000
-    style Email fill:#41B3A3,color:#fff
-    style GPT fill:#C38D9E,color:#fff
-    style VectorDB fill:#E8A87C,color:#000
+
+    EB -->|Triggers| Task
+    Task --> App
+    Task --> DB
+    App -->|localhost:8080| DB
+    DB -->|Mounts| EFS
+    Task -->|Pulls from| ECR
+    Task -->|Logs to| CW
+    App -->|API Calls| OpenAI
+    App -->|Sends Email| SES
+    Task -->|Runs in| Subnet
+    Subnet -->|Part of| VPC
+    Task -->|Protected by| SG
+
+    style EB fill:#FF9900,color:#000
+    style Task fill:#4A90E2,color:#fff
+    style App fill:#85CDCA,color:#000
+    style DB fill:#E27D60,color:#fff
+    style EFS fill:#E8A87C,color:#000
+    style SES fill:#41B3A3,color:#fff
 ```
 
 ---
 
-## 🔍 RAG Deduplication Flow
+## RAG Deduplication Flow
 
 ```mermaid
 sequenceDiagram
     participant M as main.py
     participant W as weaviate_client.py
     participant V as Weaviate DB
-    participant O as OpenAI API
-    
+    participant L as Local Embedding Model
+    participant O as OpenAI GPT-4o
+
     M->>W: is_duplicate(event)
-    
+
     Note over W: Step 1: Fast Path
-    W->>V: Check exact URL match
-    V-->>W: URL exists?
-    
+    W->>V: Query by exact URL
+    V-->>W: Match found?
+
     alt URL exists
         W-->>M: True (Duplicate)
     else URL not found
-        Note over W: Step 2: RAG Path
-        W->>V: Vector search for similar events
-        Note over V: Semantic search using embeddings
+        Note over W: Step 2: Semantic Search
+        W->>L: Generate embedding for event
+        Note over L: all-MiniLM-L6-v2<br/>384 dimensions
+        L-->>W: Query vector
+
+        W->>V: Vector similarity search<br/>threshold=0.85, limit=5
         V-->>W: Top 5 similar events
-        
-        W->>O: Ask GPT-4o: Is this duplicate?
-        Note over O: LLM analyzes:<br/>- Event name<br/>- Date<br/>- Venue<br/>- Description
-        O-->>W: {"is_duplicate": bool, "reason": str}
-        
-        alt LLM says duplicate
-            W-->>M: True (Duplicate)
-        else LLM says unique
+
+        alt No similar events
             W-->>M: False (Not duplicate)
-            M->>W: add_event(event)
-            W->>O: Generate embedding
-            O-->>W: Vector embedding
-            W->>V: Store event + embedding
+        else Similar events found
+            Note over W: Step 3: LLM Analysis
+            W->>O: Analyze: new event vs candidates
+            Note over O: Compare:<br/>- Name & Date<br/>- Venue<br/>- Description
+            O-->>W: {"is_duplicate": bool, "reason": str}
+
+            alt LLM confirms duplicate
+                W-->>M: True (Duplicate)
+            else LLM confirms unique
+                W-->>M: False (Not duplicate)
+                M->>W: add_event(event)
+                W->>L: Generate embedding
+                L-->>W: Event vector
+                W->>V: Store event + vector
+            end
         end
     end
 ```
 
 ---
 
-## 📊 Data Flow
+## Container Lifecycle
 
 ```mermaid
-flowchart LR
-    A[queries.txt] --> B[OpenAI Web Search]
-    B --> C[Raw JSON Response]
-    C --> D[event_parser.py]
-    D --> E[Structured Events]
-    E --> F{RAG Deduplication}
-    F -->|Duplicate| G[Skip]
-    F -->|Unique| H[Weaviate Vector DB]
-    H --> I[email_service.py]
-    I --> J[AWS SES]
-    J --> K[📧 User Inbox]
-    
-    style F fill:#C38D9E,color:#fff
-    style H fill:#E27D60,color:#fff
-    style K fill:#41B3A3,color:#fff
+sequenceDiagram
+    participant EB as EventBridge
+    participant ECS as ECS Fargate
+    participant W as Weaviate Container
+    participant A as Event Finder Container
+    participant EFS as EFS Volume
+
+    EB->>ECS: Trigger scheduled task
+    ECS->>W: Start container (essential=false)
+    ECS->>A: Start container (essential=true)
+
+    Note over W: Weaviate starts<br/>Loads WAL from EFS
+    W->>EFS: Read persisted data
+
+    Note over A: Wait for Weaviate health check
+    A->>W: GET /v1/meta (health)
+    W-->>A: Ready
+
+    Note over A: Execute main.py<br/>Search, deduplicate, email
+    A->>W: Store events
+    W->>EFS: Write to WAL immediately
+
+    Note over A: Execution complete
+    A->>A: Exit (code 0)
+
+    Note over ECS: Essential container exited<br/>Terminate task
+    ECS->>W: Send SIGTERM
+
+    Note over W: Graceful shutdown<br/>30-second timeout
+    W->>EFS: Flush WAL
+    EFS-->>W: Acknowledged
+
+    ECS->>W: Send SIGKILL (if needed)
+
+    Note over ECS: Task stopped<br/>Data persisted on EFS
 ```
 
 ---
 
-## 🐳 Docker Architecture
+## Data Persistence Strategy
+
+Weaviate uses a Write-Ahead-Log (WAL) approach for crash recovery:
 
 ```mermaid
-graph TB
-    subgraph "Docker Compose"
-        subgraph "Service 1: Weaviate"
-            WV[Weaviate Container<br/>Port 8080]
-            VOL1[(Volume:<br/>weaviate_data)]
-        end
-        
-        subgraph "Service 2: Event Finder"
-            APP[Python App Container<br/>main.py]
-            ENV[Environment Variables<br/>.env file]
-        end
-    end
-    
-    APP -->|HTTP| WV
-    WV --> VOL1
-    ENV --> APP
-    
-    APP -->|API Calls| OPENAI[OpenAI API]
-    APP -->|Send Email| SES[AWS SES]
-    
-    style WV fill:#E27D60,color:#fff
-    style APP fill:#4A90E2,color:#fff
-    style VOL1 fill:#E8A87C,color:#000
+graph LR
+    A[Event Added] --> B[Write to WAL on EFS]
+    B --> C[Acknowledge to Client]
+    C --> D[Update In-Memory Index]
+    D --> E[Periodic Segment Flush]
+    E --> F[Mark WAL Complete]
+
+    G[Container Restart] --> H[Check WAL Status]
+    H -->|Incomplete| I[Replay WAL]
+    H -->|Complete| J[Load Segments]
+    I --> J
+    J --> K[Ready for Queries]
+
+    style B fill:#E27D60,color:#fff
+    style E fill:#E8A87C,color:#000
+    style I fill:#C38D9E,color:#fff
 ```
 
----
-
-## 🔑 Key File Responsibilities
-
-| File | Purpose | Input | Output |
-|------|---------|-------|--------|
-| **main.py** | Orchestrates entire process | queries.txt | Email digest |
-| **config.py** | Loads environment variables | .env file | Configuration constants |
-| **query_loader.py** | Manages search queries | queries.txt | List of queries |
-| **openai_client.py** | Calls OpenAI for web search | Search query | Raw JSON events |
-| **event_parser.py** | Parses & validates events | Raw JSON | Structured dicts |
-| **weaviate_client.py** | Vector DB operations | Events | Stored/retrieved events |
-| **email_service.py** | Sends email digests | Event list | Sent email |
-| **rag_query.py** | Interactive CLI queries | User question | AI answer |
+Key guarantees:
+- Every write is persisted to EFS before acknowledgment
+- WAL entries are append-only (fast writes)
+- Incomplete WAL is replayed on startup
+- 30-second SIGTERM grace period ensures final flush
 
 ---
 
-## 🎯 Technology Stack
+## Component Responsibilities
 
-```mermaid
-mindmap
-  root((London Events<br/>AI Agent))
-    Python 3.11
-      main.py
-      Libraries
-        openai
-        weaviate-client
-        boto3
-    Vector Database
-      Weaviate
-        Semantic Search
-        Auto Embeddings
-    AI Models
-      GPT-5
-        Agentic Web Search
-        Reasoning-based Discovery
-      GPT-4o
-        Deduplication
-        Fast & Cost-effective
-      text-embedding-3-small
-        Vector Embeddings
-    Cloud Services
-      AWS SES
-        Email Delivery
-    Infrastructure
-      Docker
-        docker-compose
-        Containers
-      Terraform (planned)
-        ECS Fargate
-        ECR
-```
+| Component | Purpose | Key Technologies |
+|-----------|---------|------------------|
+| **main.py** | Orchestration and execution flow | Python, logging |
+| **openai_client.py** | GPT-5 agentic web search | OpenAI Responses API, web_search tool |
+| **weaviate_client.py** | Vector database operations | Weaviate v4 API, sentence-transformers |
+| **event_parser.py** | JSON parsing and validation | Python, data validation |
+| **email_service.py** | Email digest generation | boto3, AWS SES |
+| **config.py** | Configuration management | python-dotenv, environment variables |
+| **query_loader.py** | Query file management | File I/O, text processing |
 
 ---
 
-For detailed code examples and step-by-step explanations, see [PROCESS_FLOW.md](./PROCESS_FLOW.md).
+## Technology Stack Summary
+
+**Application Layer**:
+- Python 3.11 (runtime)
+- OpenAI SDK (GPT-5, GPT-4o)
+- Weaviate Client v4 (vector database)
+- Sentence Transformers (local embeddings)
+- boto3 (AWS SDK)
+
+**Infrastructure**:
+- AWS ECS Fargate (serverless containers)
+- AWS EventBridge (scheduling)
+- AWS ECR (container registry)
+- AWS EFS (persistent storage)
+- AWS SES (email delivery)
+- Terraform (infrastructure as code)
+- GitHub Actions (CI/CD)
+
+**Data & AI**:
+- Weaviate 1.27.5 (vector database)
+- all-MiniLM-L6-v2 (embedding model, 384 dimensions)
+- GPT-5 with web search (event discovery)
+- GPT-4o (deduplication)
+
+---
+
+For detailed process flow documentation, see [PROCESS_FLOW.md](./PROCESS_FLOW.md).
 

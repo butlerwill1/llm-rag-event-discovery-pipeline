@@ -32,10 +32,6 @@ ENV/
 
 # Documentation (not needed in container)
 *.md
-README.md
-AWS_SES_SETUP.md
-EMAIL_SUMMARY.md
-QUICK_START_EMAIL.md
 
 # Test files
 test_*.py
