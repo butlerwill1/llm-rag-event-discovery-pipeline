@@ -19,6 +19,28 @@ variable "environment" {
   default     = "prod"
 }
 
+variable "owner" {
+  description = "Owner tag used for resource accountability and cost allocation"
+  type        = string
+  default     = "unassigned"
+
+  validation {
+    condition     = trimspace(var.owner) != ""
+    error_message = "owner must not be empty."
+  }
+}
+
+variable "cost_center" {
+  description = "CostCenter tag used for AWS cost allocation reporting"
+  type        = string
+  default     = "unassigned"
+
+  validation {
+    condition     = trimspace(var.cost_center) != ""
+    error_message = "cost_center must not be empty."
+  }
+}
+
 # Application Configuration
 variable "openai_api_key" {
   description = "OpenAI API key (will be stored in Secrets Manager)"
@@ -111,13 +133,9 @@ variable "availability_zones" {
 
 # Tags
 variable "tags" {
-  description = "Common tags to apply to all resources"
+  description = "Additional tags to merge into the standard cost allocation tag set"
   type        = map(string)
-  default = {
-    Project     = "london-events-ai"
-    ManagedBy   = "terraform"
-    Environment = "prod"
-  }
+  default     = {}
 }
 
 # Docker Image
@@ -138,6 +156,5 @@ variable "weaviate_image" {
   type        = string
   default     = "semitechnologies/weaviate:1.27.5"
 }
-
 
 

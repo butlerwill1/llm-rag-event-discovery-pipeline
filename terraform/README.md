@@ -55,6 +55,8 @@ Update these required values:
 - `openai_api_key` - Your OpenAI API key
 - `ses_from_email` - Verified sender email
 - `ses_to_email` - Verified recipient email
+- `owner` - The person or team responsible for the spend
+- `cost_center` - The billing code, budget, or bucket you want to report against
 
 ### Step 2: Deploy Infrastructure
 
@@ -127,6 +129,23 @@ enable_nat_gateway = true
 # Use public subnets (cheaper, less secure)
 enable_nat_gateway = false  # Default
 ```
+
+### Cost Allocation Tags
+
+Terraform now applies these tags automatically to supported AWS resources:
+
+- `Project`
+- `Environment`
+- `ManagedBy`
+- `Owner`
+- `CostCenter`
+
+Use `tags` in `terraform.tfvars` for any extra reporting dimensions you want, such as
+`Repository`, `Team`, or `Workload`.
+
+To see these in AWS Cost Explorer or CUR, activate the user-defined cost allocation
+tags in the AWS Billing and Cost Management console after the first tagged resources
+have been created.
 
 ### Resource Sizing
 
@@ -234,4 +253,3 @@ terraform destroy
 - [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 - [EFS with ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.html)
 - [EventBridge Scheduler](https://docs.aws.amazon.com/scheduler/latest/UserGuide/what-is-scheduler.html)
-

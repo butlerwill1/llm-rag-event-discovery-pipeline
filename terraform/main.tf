@@ -22,7 +22,7 @@ provider "aws" {
   region = var.aws_region
 
   default_tags {
-    tags = var.tags
+    tags = local.common_tags
   }
 }
 
@@ -48,7 +48,12 @@ locals {
   common_tags = merge(
     var.tags,
     {
-      Name = var.project_name
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+      Owner       = var.owner
+      CostCenter  = var.cost_center
+      Name        = var.project_name
     }
   )
 }
@@ -178,4 +183,3 @@ module "scheduler" {
 
   tags = local.common_tags
 }
-
