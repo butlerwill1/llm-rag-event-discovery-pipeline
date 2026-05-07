@@ -1,11 +1,14 @@
 """
 Configuration settings for the Event Finding AI Agent
 """
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Load environment variables from the repository root .env file when present.
+load_dotenv(PROJECT_ROOT / ".env")
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -13,13 +16,14 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
 
 # File paths
-# Support both local development and Docker container
-DATA_DIR = os.getenv("DATA_DIR", "data")  # Use 'data' directory for Docker, current dir for local
-QUERIES_FILE = "queries.txt"
-EVENTS_LOG_FILE = os.path.join(DATA_DIR, "events_log.csv")
+# Resolve data paths from the project root so the package works from any cwd.
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR))).resolve()
+QUERIES_FILE = Path(os.getenv("QUERIES_FILE", str(DATA_DIR / "queries.txt"))).resolve()
+EVENTS_LOG_FILE = str((DATA_DIR / "events_log.csv").resolve())
 
 # Create data directory if it doesn't exist
-os.makedirs(DATA_DIR, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # OpenAI Model Configuration
 # Using GPT-5 with agentic search for intelligent, reasoning-based event discovery

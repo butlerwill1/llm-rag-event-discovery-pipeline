@@ -125,7 +125,7 @@ The pipeline is designed for cost-effective, scheduled execution:
    - Local embedding model loads from pre-cached image layer
 
 2. **Event Discovery**
-   - Load search queries from `queries.txt`
+   - Load search queries from `data/queries.txt`
    - For each query, GPT-5 performs agentic web search
    - Parse structured JSON responses into event objects
 
@@ -161,25 +161,28 @@ This ensures no data loss even with immediate container shutdown.
 
 ```
 .
-├── main.py                    # Orchestration logic
-├── openai_client.py           # GPT-5 agentic search client
-├── weaviate_client.py         # Vector database operations
-├── event_parser.py            # JSON response parsing
-├── email_service.py           # AWS SES integration
-├── config.py                  # Configuration and prompts
-├── queries.txt                # Search queries (one per line)
-├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Container definition
-├── docker-compose.yml         # Local development setup
-├── terraform/                 # Infrastructure as Code
-│   ├── main.tf               # Root module
-│   ├── modules/
-│   │   ├── ecs/              # ECS cluster, task definition
-│   │   ├── ecr/              # Container registry
-│   │   ├── efs/              # Persistent storage
-│   │   ├── scheduler/        # EventBridge scheduling
-│   │   └── ses/              # Email service
-│   └── variables.tf          # Configuration variables
+├── main.py                    # Root entrypoint wrapper
+├── rag_query.py               # Root RAG utility wrapper
+├── email_service.py           # Root email test wrapper
+├── src/
+│   └── ai_agent/             # Application package
+│       ├── main.py           # Orchestration logic
+│       ├── openai_client.py  # GPT-5 agentic search client
+│       ├── weaviate_client.py # Vector database operations
+│       ├── event_parser.py   # JSON response parsing
+│       ├── email_service.py  # AWS SES integration
+│       ├── query_loader.py   # Query file management
+│       └── config.py         # Configuration and prompts
+├── data/
+│   └── queries.txt           # Search queries
+├── docs/
+│   ├── ARCHITECTURE.md       # Architecture notes
+│   ├── PROCESS_FLOW.md       # Execution flow details
+│   └── guides/               # Task-specific guides
+├── requirements.txt          # Python dependencies
+├── Dockerfile                # Container definition
+├── docker-compose.yml        # Local development setup
+├── terraform/                # Infrastructure as Code
 └── .github/workflows/
     └── deploy.yml            # CI/CD pipeline
 ```
@@ -312,5 +315,4 @@ Monthly costs (assuming weekly execution):
 - Web dashboard for event browsing
 - Slack/Discord notification integration
 - Advanced filtering (price range, event type, venue)
-
 

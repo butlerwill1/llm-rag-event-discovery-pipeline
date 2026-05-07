@@ -39,7 +39,7 @@ env/
 
 # Data files (CSV will be in S3 for production)
 events_log.csv
-data/
+data/events_log.csv
 
 # Logs
 *.log
@@ -59,4 +59,3 @@ htmlcov/
 .DS_Store
 .AppleDouble
 .LSOverride
-

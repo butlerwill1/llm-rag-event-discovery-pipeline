@@ -24,7 +24,7 @@ graph TD
 
     Init --> Weaviate[Connect to Weaviate]
     Init --> LoadModel[Load Local Embedding Model]
-    Init --> QueryLoad[Load queries.txt]
+    Init --> QueryLoad[Load data/queries.txt]
 
     Weaviate --> HealthCheck{Weaviate Healthy?}
     HealthCheck -->|No| Wait[Wait & Retry]
@@ -151,7 +151,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant M as main.py
-    participant W as weaviate_client.py
+    participant W as src/ai_agent/weaviate_client.py
     participant V as Weaviate DB
     participant L as Local Embedding Model
     participant O as OpenAI GPT-4o
@@ -274,12 +274,12 @@ Key guarantees:
 | Component | Purpose | Key Technologies |
 |-----------|---------|------------------|
 | **main.py** | Orchestration and execution flow | Python, logging |
-| **openai_client.py** | GPT-5 agentic web search | OpenAI Responses API, web_search tool |
-| **weaviate_client.py** | Vector database operations | Weaviate v4 API, sentence-transformers |
-| **event_parser.py** | JSON parsing and validation | Python, data validation |
-| **email_service.py** | Email digest generation | boto3, AWS SES |
-| **config.py** | Configuration management | python-dotenv, environment variables |
-| **query_loader.py** | Query file management | File I/O, text processing |
+| **src/ai_agent/openai_client.py** | GPT-5 agentic web search | OpenAI Responses API, web_search tool |
+| **src/ai_agent/weaviate_client.py** | Vector database operations | Weaviate v4 API, sentence-transformers |
+| **src/ai_agent/event_parser.py** | JSON parsing and validation | Python, data validation |
+| **src/ai_agent/email_service.py** | Email digest generation | boto3, AWS SES |
+| **src/ai_agent/config.py** | Configuration management | python-dotenv, environment variables |
+| **src/ai_agent/query_loader.py** | Query file management | File I/O, text processing |
 
 ---
 
@@ -310,4 +310,3 @@ Key guarantees:
 ---
 
 For detailed process flow documentation, see [PROCESS_FLOW.md](./PROCESS_FLOW.md).
-

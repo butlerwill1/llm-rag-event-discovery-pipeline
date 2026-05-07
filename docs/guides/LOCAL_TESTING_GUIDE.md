@@ -116,10 +116,10 @@ WEAVIATE_URL=http://localhost:8080  # For local Python, use localhost
 
 ### 2. Check your queries
 
-Edit `queries.txt` to customize what events to search for:
+Edit `data/queries.txt` to customize what events to search for:
 
 ```bash
-cat queries.txt
+cat data/queries.txt
 ```
 
 Example queries:
@@ -380,12 +380,12 @@ docker-compose restart weaviate
 
 This is expected if AWS SES isn't configured. Options:
 1. Skip email testing initially (focus on event finding)
-2. Configure AWS SES (see `guides/AWS_SES_SETUP.md`)
+2. Configure AWS SES (see `docs/guides/AWS_SES_SETUP.md`)
 3. Comment out email section in `main.py` temporarily
 
 ### Issue 5: "No events found"
 
-- Check your queries in `queries.txt` - make them more specific
+- Check your queries in `data/queries.txt` - make them more specific
 - Check OpenAI API quota/billing
 - Try a simpler query: "London tech events this week"
 
@@ -410,7 +410,7 @@ Your local testing is successful if:
 
 Once local testing works:
 
-1. **Optimize queries** - Refine `queries.txt` for better results
+1. **Optimize queries** - Refine `data/queries.txt` for better results
 2. **Test email** - Configure AWS SES and test email delivery
 3. **Schedule runs** - Set up cron job or use Docker restart policies
 4. **Deploy to AWS** - Use Terraform to deploy to ECS Fargate
@@ -429,4 +429,3 @@ Once local testing works:
 ---
 
 Happy testing! 🚀
-

@@ -117,7 +117,7 @@ docker-compose up
 
 # Expected output:
 # Starting event search...
-# Loading queries from queries.txt
+# Loading queries from data/queries.txt
 # Found X events...
 # 📧 Sending email digest...
 # ✅ Email sent successfully!
@@ -153,7 +153,7 @@ docker run -it --env-file .env -v $(pwd)/data:/app/data event-finder /bin/bash
 
 # Inside container, you can:
 ls -la                    # See files
-cat config.py             # View code
+cat src/ai_agent/config.py             # View code
 python main.py            # Run manually
 env | grep SES            # Check environment variables
 

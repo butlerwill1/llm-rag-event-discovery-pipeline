@@ -14,7 +14,7 @@ Instead of using a simple similarity threshold, the system now uses **Retrieval-
 - ✅ Returns explainable decisions with reasoning
 - ✅ Automatic fallback to simple similarity if LLM fails
 
-**Location:** `weaviate_client.py` → `is_duplicate()`, `_is_duplicate_with_llm()`
+**Location:** `src/ai_agent/weaviate_client.py` → `is_duplicate()`, `_is_duplicate_with_llm()`
 
 ### 2. **Automated Database Cleanup**
 
@@ -27,7 +27,7 @@ Automatically removes events that already occurred to save storage costs and imp
 - ✅ Reduces vector database size by ~60%
 - ✅ Lowers deduplication costs
 
-**Location:** `weaviate_client.py` → `cleanup_past_events()`
+**Location:** `src/ai_agent/weaviate_client.py` → `cleanup_past_events()`
 
 ### 3. **Email Service Integration**
 
@@ -43,7 +43,7 @@ Updated email service to send only the newly found events (after deduplication),
 
 ## 📁 Files Modified
 
-### `weaviate_client.py`
+### `src/ai_agent/weaviate_client.py`
 **Changes:**
 1. Added `OpenAI` client initialization for LLM calls
 2. Replaced `is_duplicate()` with intelligent RAG-powered version
@@ -228,7 +228,7 @@ Date: "2025-03-15"
 ### Enable/Disable LLM Deduplication
 
 ```python
-# In weaviate_client.py
+# In src/ai_agent/weaviate_client.py
 is_dup = store.is_duplicate(event, use_llm=True)   # RAG-powered (default)
 is_dup = store.is_duplicate(event, use_llm=False)  # Simple similarity
 ```

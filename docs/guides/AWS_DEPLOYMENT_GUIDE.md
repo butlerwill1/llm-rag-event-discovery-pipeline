@@ -435,10 +435,9 @@ docker push <account-id>.dkr.ecr.eu-west-1.amazonaws.com/event-finder:latest
 - **AWS Free Tier**: First 12 months (750 hours EC2 t2.micro free)
 - **AWS Documentation**: https://docs.aws.amazon.com/
 - **ECS Tutorial**: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/
-- **SES Setup Guide**: Already in `guides/AWS_SES_SETUP.md`
+- **SES Setup Guide**: Already in `docs/guides/AWS_SES_SETUP.md`
 
 ---
 
 **Ready to deploy?** Let me know which option you prefer, and I'll create the deployment scripts! 🚀
-
 

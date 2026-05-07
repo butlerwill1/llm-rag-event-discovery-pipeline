@@ -4,7 +4,7 @@ Module for loading and managing search queries
 import os
 from datetime import datetime, timedelta
 from typing import List
-from config import QUERIES_FILE
+from .config import QUERIES_FILE
 
 
 def load_queries() -> List[str]:
@@ -105,7 +105,7 @@ def enhance_marathon_query(query: str) -> str:
 
 def create_default_queries_file():
     """
-    Create a default queries.txt file with sample queries.
+    Create the default query file with sample queries.
     """
     default_queries = [
         "# Event search queries - one per line",
@@ -129,6 +129,7 @@ def create_default_queries_file():
     ]
     
     try:
+        os.makedirs(QUERIES_FILE.parent, exist_ok=True)
         with open(QUERIES_FILE, 'w', encoding='utf-8') as file:
             file.write('\n'.join(default_queries))
         print(f"Created default {QUERIES_FILE} with sample queries.")

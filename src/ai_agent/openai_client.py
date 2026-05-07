@@ -3,7 +3,7 @@ Module for interacting with OpenAI's Responses API with agentic search
 """
 import openai
 from typing import List, Dict, Any
-from config import OPENAI_API_KEY, MODEL_NAME, REASONING_EFFORT, PROMPT_TEMPLATE
+from .config import OPENAI_API_KEY, MODEL_NAME, REASONING_EFFORT, PROMPT_TEMPLATE
 
 
 class EventSearchClient:

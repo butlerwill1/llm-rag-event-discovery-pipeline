@@ -6,8 +6,8 @@ on:
     paths-ignore:
       # Skip deployment when only these files/folders change
       - 'terraform/**'           # Infrastructure changes don't need Docker rebuild
-      - 'guides/**'              # Documentation changes
-      - '*.md'                   # Markdown files (README, ARCHITECTURE, etc.)
+      - 'docs/**'                # Documentation changes
+      - '*.md'                   # Root markdown files
       - '.github/**'             # Workflow changes (except this file triggers itself)
   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
@@ -65,4 +65,3 @@ jobs:
         echo "🔗 Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
         echo ""
         echo "ℹ️  The ECS scheduled task will use this image on its next run"
-
