@@ -80,7 +80,7 @@ class EmailService:
                 "",
                 f"Total events in database: {total_events}",
                 "",
-                "Powered by your Event Finding AI Agent"
+                "Powered by the LLM RAG Event Discovery Pipeline"
             ])
             return "\n".join(lines)
         
@@ -124,7 +124,7 @@ class EmailService:
         lines.append(f"- Total new events found: {len(new_events)}")
         lines.append(f"- Total events in database: {total_events}")
         lines.append("")
-        lines.append("Powered by your Event Finding AI Agent")
+        lines.append("Powered by the LLM RAG Event Discovery Pipeline")
         
         return "\n".join(lines)
     
@@ -170,7 +170,7 @@ class EmailService:
                 <strong>Total events in database:</strong> {total_events}
             </div>
             <div class="footer">
-                Powered by your Event Finding AI Agent
+                Powered by the LLM RAG Event Discovery Pipeline
             </div>
             </body>
             </html>
@@ -213,7 +213,7 @@ class EmailService:
             • Total events in database: {total_events}
         </div>
         <div class="footer">
-            Powered by your Event Finding AI Agent
+            Powered by the LLM RAG Event Discovery Pipeline
         </div>
         </body>
         </html>

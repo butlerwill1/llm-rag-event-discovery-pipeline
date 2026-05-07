@@ -228,7 +228,7 @@ Deduplication checks: 200 instead of 500 (60% reduction!)
 
 ### Enable/Disable LLM Deduplication
 
-In `src/ai_agent/weaviate_client.py`:
+In `src/llm_rag_event_discovery_pipeline/weaviate_client.py`:
 
 ```python
 # Use LLM (recommended)

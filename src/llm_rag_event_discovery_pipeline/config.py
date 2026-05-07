@@ -1,5 +1,5 @@
 """
-Configuration settings for the Event Finding AI Agent
+Configuration settings for the LLM RAG Event Discovery Pipeline
 """
 from pathlib import Path
 import os

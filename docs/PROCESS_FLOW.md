@@ -1,6 +1,6 @@
 # Process Flow Documentation
 
-Detailed execution flow and component interactions for the Event Discovery RAG Pipeline.
+Detailed execution flow and component interactions for the LLM RAG Event Discovery Pipeline.
 
 ---
 
@@ -9,12 +9,12 @@ Detailed execution flow and component interactions for the Event Discovery RAG P
 | File | Purpose | Dependencies |
 |------|---------|--------------|
 | **main.py** | Orchestration and execution flow | All components |
-| **src/ai_agent/config.py** | Environment configuration | python-dotenv |
-| **src/ai_agent/query_loader.py** | Query file management | data/queries.txt |
-| **src/ai_agent/openai_client.py** | GPT-5 agentic web search | OpenAI SDK |
-| **src/ai_agent/event_parser.py** | JSON response parsing | json, logging |
-| **src/ai_agent/weaviate_client.py** | Vector database operations | Weaviate v4, sentence-transformers, OpenAI |
-| **src/ai_agent/email_service.py** | Email digest generation | boto3 (AWS SES) |
+| **src/llm_rag_event_discovery_pipeline/config.py** | Environment configuration | python-dotenv |
+| **src/llm_rag_event_discovery_pipeline/query_loader.py** | Query file management | data/queries.txt |
+| **src/llm_rag_event_discovery_pipeline/openai_client.py** | GPT-5 agentic web search | OpenAI SDK |
+| **src/llm_rag_event_discovery_pipeline/event_parser.py** | JSON response parsing | json, logging |
+| **src/llm_rag_event_discovery_pipeline/weaviate_client.py** | Vector database operations | Weaviate v4, sentence-transformers, OpenAI |
+| **src/llm_rag_event_discovery_pipeline/email_service.py** | Email digest generation | boto3 (AWS SES) |
 
 ---
 
@@ -32,7 +32,7 @@ Detailed execution flow and component interactions for the Event Discovery RAG P
 **Component Initialization (main.py):**
 ```python
 # Load configuration
-from ai_agent.config import QUERIES_FILE, OPENAI_API_KEY, AWS_REGION
+from llm_rag_event_discovery_pipeline.config import QUERIES_FILE, OPENAI_API_KEY, AWS_REGION
 
 # Connect to Weaviate
 weaviate_store = WeaviateEventStore()
@@ -59,7 +59,7 @@ queries = load_queries()  # Reads data/queries.txt
 deleted_count = weaviate_store.cleanup_past_events()
 ```
 
-**Implementation (src/ai_agent/weaviate_client.py):**
+**Implementation (src/llm_rag_event_discovery_pipeline/weaviate_client.py):**
 1. Get current date
 2. Query Weaviate: `eventDate < today`
 3. Delete each past event by UUID
@@ -74,7 +74,7 @@ deleted_count = weaviate_store.cleanup_past_events()
 
 ### Step 3: Event Discovery
 
-**Agentic Web Search (src/ai_agent/openai_client.py):**
+**Agentic Web Search (src/llm_rag_event_discovery_pipeline/openai_client.py):**
 ```python
 for query in queries:
     client = EventSearchClient()
@@ -117,13 +117,13 @@ response = self.client.responses.create(
 
 ### Step 4: Response Parsing
 
-**Parse JSON Response (src/ai_agent/event_parser.py):**
+**Parse JSON Response (src/llm_rag_event_discovery_pipeline/event_parser.py):**
 ```python
 # main.py
-events = parse_openai_response(response)  # src/ai_agent/event_parser.py
+events = parse_openai_response(response)  # src/llm_rag_event_discovery_pipeline/event_parser.py
 ```
 
-**Parsing Logic (src/ai_agent/event_parser.py):**
+**Parsing Logic (src/llm_rag_event_discovery_pipeline/event_parser.py):**
 ```python
 def parse_openai_response(response: str):
     # Parse JSON string
@@ -155,7 +155,7 @@ def parse_openai_response(response: str):
 
 **Phase 1: Fast Path (Exact URL Match)**
 ```python
-# src/ai_agent/weaviate_client.py
+# src/llm_rag_event_discovery_pipeline/weaviate_client.py
 def is_duplicate(self, event):
     # Check for exact URL match
     results = events.query.fetch_objects(
@@ -217,7 +217,7 @@ response = openai.chat.completions.create(
 
 ### Step 6: Event Storage
 
-**Add New Event (src/ai_agent/weaviate_client.py):**
+**Add New Event (src/llm_rag_event_discovery_pipeline/weaviate_client.py):**
 ```python
 def add_event(self, event):
     # Prepare properties
@@ -258,7 +258,7 @@ def add_event(self, event):
 
 ### Step 7: Email Digest Generation
 
-**Format and Send Email (src/ai_agent/email_service.py):**
+**Format and Send Email (src/llm_rag_event_discovery_pipeline/email_service.py):**
 ```python
 # main.py
 email_service = create_email_service_from_env()
@@ -270,7 +270,7 @@ email_sent = email_service.send_weekly_digest(
 
 **Email Service Implementation:**
 ```python
-# src/ai_agent/email_service.py
+# src/llm_rag_event_discovery_pipeline/email_service.py
 def send_weekly_digest(self, events, total_count):
     # Build HTML email body
     html_body = build_html_template(events, total_count)
@@ -395,14 +395,14 @@ This system uses **document-level RAG** rather than chunk-based RAG:
 
 ### main.py (Orchestrator)
 **Calls:**
-- `src/ai_agent/config.py` - Load environment variables
-- `src/ai_agent/query_loader.py` - Load search queries
-- `src/ai_agent/openai_client.py` - Perform web search
-- `src/ai_agent/event_parser.py` - Parse JSON responses
-- `src/ai_agent/weaviate_client.py` - Deduplication and storage
-- `src/ai_agent/email_service.py` - Send digest
+- `src/llm_rag_event_discovery_pipeline/config.py` - Load environment variables
+- `src/llm_rag_event_discovery_pipeline/query_loader.py` - Load search queries
+- `src/llm_rag_event_discovery_pipeline/openai_client.py` - Perform web search
+- `src/llm_rag_event_discovery_pipeline/event_parser.py` - Parse JSON responses
+- `src/llm_rag_event_discovery_pipeline/weaviate_client.py` - Deduplication and storage
+- `src/llm_rag_event_discovery_pipeline/email_service.py` - Send digest
 
-### src/ai_agent/weaviate_client.py (Vector Database)
+### src/llm_rag_event_discovery_pipeline/weaviate_client.py (Vector Database)
 **Calls:**
 - Local embedding model (sentence-transformers)
 - OpenAI GPT-4o (for deduplication decisions)
@@ -414,7 +414,7 @@ This system uses **document-level RAG** rather than chunk-based RAG:
 - Semantic search
 - Event retrieval
 
-### src/ai_agent/openai_client.py (Web Search)
+### src/llm_rag_event_discovery_pipeline/openai_client.py (Web Search)
 **Calls:**
 - OpenAI Responses API (GPT-5)
 - Web search tool
@@ -424,7 +424,7 @@ This system uses **document-level RAG** rather than chunk-based RAG:
 - Structured JSON output
 - Multi-step search execution
 
-### src/ai_agent/email_service.py (Notifications)
+### src/llm_rag_event_discovery_pipeline/email_service.py (Notifications)
 **Calls:**
 - AWS SES (boto3)
 

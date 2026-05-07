@@ -36,7 +36,7 @@ resource "aws_scheduler_schedule" "main" {
     }
   }
 
-  description = "Daily execution of London Events AI Agent"
+  description = "Daily execution of LLM RAG Event Discovery Pipeline"
 }
 
 # IAM Role for EventBridge Scheduler

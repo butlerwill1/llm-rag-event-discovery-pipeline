@@ -1,6 +1,6 @@
 # 🧪 Local Testing Guide
 
-This guide walks you through testing the London Events AI Agent on your local machine.
+This guide walks you through testing the LLM RAG Event Discovery Pipeline on your local machine.
 
 ---
 
@@ -41,7 +41,7 @@ docker-compose up
 ✅ Weaviate is healthy
 ✅ Building event-finder image...
 ✅ Starting event-finder...
-🤖 Personal Event Finding AI Agent
+LLM RAG Event Discovery Pipeline
 ==================================================
 Initializing Weaviate...
 ✅ Connected to Weaviate

@@ -70,7 +70,7 @@ output "deployment_instructions" {
   value       = <<-EOT
     
     ╔════════════════════════════════════════════════════════════════════╗
-    ║          London Events AI Agent - Deployment Complete!            ║
+    ║          LLM RAG Event Discovery Pipeline - Deployment Complete!            ║
     ╚════════════════════════════════════════════════════════════════════╝
     
     📦 Next Steps:

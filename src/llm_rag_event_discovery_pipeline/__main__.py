@@ -1,4 +1,4 @@
-# Summary: Package entrypoint for running the event discovery agent with `python -m ai_agent`.
+# Summary: Package entrypoint for running the LLM RAG Event Discovery Pipeline with `python -m llm_rag_event_discovery_pipeline`.
 
 import sys
 

@@ -10,7 +10,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from ai_agent.rag_query import main
+from llm_rag_event_discovery_pipeline.rag_query import main
 
 
 if __name__ == "__main__":

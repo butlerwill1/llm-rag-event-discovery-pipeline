@@ -78,7 +78,7 @@ docker build -t event-finder .
 ```
 Your Computer                    Container
 ─────────────                    ─────────
-/Users/wbutler/ai_agent/
+/Users/wbutler/Documents/Github/llm-rag-event-discovery-pipeline/
   └── data/
       └── events_log.csv  ←──→  /app/data/events_log.csv
 ```
@@ -153,7 +153,7 @@ docker run -it --env-file .env -v $(pwd)/data:/app/data event-finder /bin/bash
 
 # Inside container, you can:
 ls -la                    # See files
-cat src/ai_agent/config.py             # View code
+cat src/llm_rag_event_discovery_pipeline/config.py             # View code
 python main.py            # Run manually
 env | grep SES            # Check environment variables
 

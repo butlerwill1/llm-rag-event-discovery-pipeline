@@ -1,4 +1,4 @@
-# Terraform Variables for London Events AI Agent
+# Terraform Variables for LLM RAG Event Discovery Pipeline
 # Configure these values in terraform.tfvars or pass via command line
 
 variable "aws_region" {

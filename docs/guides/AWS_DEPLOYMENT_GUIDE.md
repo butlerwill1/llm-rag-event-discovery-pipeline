@@ -1,6 +1,6 @@
 # 🚀 AWS Deployment Guide
 
-This guide explains how to deploy your London Events AI Agent to AWS for automated, scheduled execution.
+This guide explains how to deploy your LLM RAG Event Discovery Pipeline to AWS for automated, scheduled execution.
 
 ---
 
@@ -410,7 +410,7 @@ docker push <account-id>.dkr.ecr.eu-west-1.amazonaws.com/event-finder:latest
 2. Install Docker and Docker Compose
 3. Copy your code and `.env` file
 4. Run `docker-compose up -d`
-5. Set up cron job: `0 9 * * * cd /home/ubuntu/ai_agent && docker-compose run event-finder`
+5. Set up cron job: `0 9 * * * cd /home/ubuntu/llm-rag-event-discovery-pipeline && docker-compose run event-finder`
 
 **When to upgrade to ECS Fargate:**
 - You need high availability (auto-restart on failure)

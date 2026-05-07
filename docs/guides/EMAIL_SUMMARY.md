@@ -6,7 +6,7 @@ A complete email notification system that sends weekly event digests via AWS SES
 
 ## 📁 New Files Created
 
-### `src/ai_agent/email_service.py` (423 lines)
+### `src/llm_rag_event_discovery_pipeline/email_service.py` (423 lines)
 Complete email service with:
 - **EmailService class**: Handles all email operations
 - **Text email formatting**: Plain text version for email clients
@@ -27,7 +27,7 @@ Step-by-step guide for:
 
 ## 🔧 Modified Files
 
-### `src/ai_agent/config.py`
+### `src/llm_rag_event_discovery_pipeline/config.py`
 Added:
 ```python
 AWS_REGION = "eu-west-1"

@@ -2,7 +2,7 @@
 
 ## ✅ What We've Built
 
-A complete, production-ready Terraform infrastructure for deploying your London Events AI Agent to AWS ECS Fargate.
+A complete, production-ready Terraform infrastructure for deploying your LLM RAG Event Discovery Pipeline to AWS ECS Fargate.
 
 ### 📦 Infrastructure Components
 

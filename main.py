@@ -1,4 +1,4 @@
-# Summary: Backward-compatible root entrypoint for the event discovery agent.
+# Summary: Backward-compatible root entrypoint for the LLM RAG Event Discovery Pipeline.
 
 from pathlib import Path
 import sys
@@ -10,7 +10,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from ai_agent.main import interactive_mode, main
+from llm_rag_event_discovery_pipeline.main import interactive_mode, main
 
 
 if __name__ == "__main__":

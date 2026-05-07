@@ -1,6 +1,6 @@
-# Terraform Deployment for London Events AI Agent
+# Terraform Deployment for LLM RAG Event Discovery Pipeline
 
-This directory contains Terraform infrastructure-as-code for deploying the London Events AI Agent to AWS ECS Fargate.
+This directory contains Terraform infrastructure-as-code for deploying the LLM RAG Event Discovery Pipeline to AWS ECS Fargate.
 
 ## 🏗️ Architecture
 

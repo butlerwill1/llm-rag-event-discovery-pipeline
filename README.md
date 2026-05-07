@@ -1,4 +1,4 @@
-# Event Discovery RAG Pipeline
+# LLM RAG Event Discovery Pipeline
 
 An automated event discovery system that combines LLM-powered web search with vector database deduplication, deployed as a serverless pipeline on AWS.
 
@@ -165,7 +165,7 @@ This ensures no data loss even with immediate container shutdown.
 ├── rag_query.py               # Root RAG utility wrapper
 ├── email_service.py           # Root email test wrapper
 ├── src/
-│   └── ai_agent/             # Application package
+│   └── llm_rag_event_discovery_pipeline/             # Application package
 │       ├── main.py           # Orchestration logic
 │       ├── openai_client.py  # GPT-5 agentic search client
 │       ├── weaviate_client.py # Vector database operations

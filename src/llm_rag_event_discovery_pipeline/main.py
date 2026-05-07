@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Personal Event Finding AI Agent
+LLM RAG Event Discovery Pipeline
 
 This script periodically searches for London-based events using OpenAI's Responses API
 and logs new events to a Weaviate Vector Database.
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main function that orchestrates the event finding process."""
-    print("🤖 Personal Event Finding AI Agent")
+    print("🤖 LLM RAG Event Discovery Pipeline")
     print("=" * 50)
 
     # Initialize Weaviate store
@@ -230,7 +230,7 @@ def main():
 
 def interactive_mode():
     """Interactive mode for managing queries and searching events."""
-    print("🔍 Interactive Event Search Mode")
+    print("Interactive Event Discovery Mode")
     print("Commands: search, add, remove, list, summary, find, quit")
 
     client = EventSearchClient()

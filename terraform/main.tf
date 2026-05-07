@@ -1,4 +1,4 @@
-# Main Terraform configuration for London Events AI Agent on ECS Fargate
+# Main Terraform configuration for LLM RAG Event Discovery Pipeline on ECS Fargate
 
 terraform {
   required_version = ">= 1.0"

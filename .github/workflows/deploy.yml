@@ -1,4 +1,4 @@
-name: Deploy London Events AI Agent
+name: Deploy LLM RAG Event Discovery Pipeline
 
 on:
   push:

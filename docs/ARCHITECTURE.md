@@ -1,6 +1,6 @@
 # System Architecture
 
-Technical architecture documentation for the Event Discovery RAG Pipeline.
+Technical architecture documentation for the LLM RAG Event Discovery Pipeline.
 
 ## AI Model Strategy
 
@@ -151,7 +151,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant M as main.py
-    participant W as src/ai_agent/weaviate_client.py
+    participant W as src/llm_rag_event_discovery_pipeline/weaviate_client.py
     participant V as Weaviate DB
     participant L as Local Embedding Model
     participant O as OpenAI GPT-4o
@@ -274,12 +274,12 @@ Key guarantees:
 | Component | Purpose | Key Technologies |
 |-----------|---------|------------------|
 | **main.py** | Orchestration and execution flow | Python, logging |
-| **src/ai_agent/openai_client.py** | GPT-5 agentic web search | OpenAI Responses API, web_search tool |
-| **src/ai_agent/weaviate_client.py** | Vector database operations | Weaviate v4 API, sentence-transformers |
-| **src/ai_agent/event_parser.py** | JSON parsing and validation | Python, data validation |
-| **src/ai_agent/email_service.py** | Email digest generation | boto3, AWS SES |
-| **src/ai_agent/config.py** | Configuration management | python-dotenv, environment variables |
-| **src/ai_agent/query_loader.py** | Query file management | File I/O, text processing |
+| **src/llm_rag_event_discovery_pipeline/openai_client.py** | GPT-5 agentic web search | OpenAI Responses API, web_search tool |
+| **src/llm_rag_event_discovery_pipeline/weaviate_client.py** | Vector database operations | Weaviate v4 API, sentence-transformers |
+| **src/llm_rag_event_discovery_pipeline/event_parser.py** | JSON parsing and validation | Python, data validation |
+| **src/llm_rag_event_discovery_pipeline/email_service.py** | Email digest generation | boto3, AWS SES |
+| **src/llm_rag_event_discovery_pipeline/config.py** | Configuration management | python-dotenv, environment variables |
+| **src/llm_rag_event_discovery_pipeline/query_loader.py** | Query file management | File I/O, text processing |
 
 ---
 
