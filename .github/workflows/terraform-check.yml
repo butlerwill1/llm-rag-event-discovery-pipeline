@@ -1,13 +1,16 @@
 name: Terraform Validation
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform-check.yml'
   push:
     branches: [main]
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform-check.yml'
 
 jobs:
   terraform:
@@ -21,7 +24,9 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: 1.6.0
+        # Terraform 1.6.0 has a provider signature verification bug that can
+        # fail init with "openpgp: key expired" for valid providers.
+        terraform_version: 1.6.1
     
     - name: Terraform Format Check
       working-directory: ./terraform
@@ -38,4 +43,3 @@ jobs:
     - name: Output result
       if: success()
       run: echo "✅ Terraform configuration is valid!"
-
